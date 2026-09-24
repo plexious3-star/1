@@ -1,0 +1,40 @@
+newmtl HuskTail_Claw
+Kd 1 1 1
+d 1
+map_Kd textures/HuskTail_Claw.png
+
+newmtl HuskTail_Skin
+Kd 1 1 1
+d 1
+map_Kd textures/HuskTail_Skin.png
+
+newmtl BoneTail_Bone
+Kd 1 1 1
+d 1
+map_Kd textures/BoneTail_Bone.png
+
+newmtl BoneTail_BoneDark
+Kd 1 1 1
+d 1
+map_Kd textures/BoneTail_BoneDark.png
+
+newmtl BoneTail_SkinDark
+Kd 1 1 1
+d 1
+map_Kd textures/BoneTail_SkinDark.png
+
+newmtl BladeTail_Bone
+Kd 1 1 1
+d 1
+map_Kd textures/BladeTail_Bone.png
+
+newmtl BladeTail_Claw
+Kd 1 1 1
+d 1
+map_Kd textures/BladeTail_Claw.png
+
+newmtl BladeTail_Skin
+Kd 1 1 1
+d 1
+map_Kd textures/BladeTail_Skin.png
+

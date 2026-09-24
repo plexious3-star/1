@@ -1,0 +1,65 @@
+newmtl Wing_Membrane
+Kd 1 1 1
+d 1
+map_Kd textures/Wing_Membrane.png
+
+newmtl Wing_Skin
+Kd 1 1 1
+d 1
+map_Kd textures/Wing_Skin.png
+
+newmtl Wing_SkinDark
+Kd 1 1 1
+d 1
+map_Kd textures/Wing_SkinDark.png
+
+newmtl BoneWing_Bone
+Kd 1 1 1
+d 1
+map_Kd textures/BoneWing_Bone.png
+
+newmtl BoneWing_BoneDark
+Kd 1 1 1
+d 1
+map_Kd textures/BoneWing_BoneDark.png
+
+newmtl BoneWing_Skin
+Kd 1 1 1
+d 1
+map_Kd textures/BoneWing_Skin.png
+
+newmtl Tendril_Flesh
+Kd 1 1 1
+d 1
+map_Kd textures/Tendril_Flesh.png
+
+newmtl Tendril_Skin
+Kd 1 1 1
+d 1
+map_Kd textures/Tendril_Skin.png
+
+newmtl Spikes_Bone
+Kd 1 1 1
+d 1
+map_Kd textures/Spikes_Bone.png
+
+newmtl Spikes_SkinDark
+Kd 1 1 1
+d 1
+map_Kd textures/Spikes_SkinDark.png
+
+newmtl Shell_BoneDark
+Kd 1 1 1
+d 1
+map_Kd textures/Shell_BoneDark.png
+
+newmtl Shell_SkinDark
+Kd 1 1 1
+d 1
+map_Kd textures/Shell_SkinDark.png
+
+newmtl Shell_SkinDeep
+Kd 1 1 1
+d 1
+map_Kd textures/Shell_SkinDeep.png
+

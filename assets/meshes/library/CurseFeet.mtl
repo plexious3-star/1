@@ -1,0 +1,50 @@
+newmtl SplayedFoot_Claw
+Kd 1 1 1
+d 1
+map_Kd textures/SplayedFoot_Claw.png
+
+newmtl SplayedFoot_Skin
+Kd 1 1 1
+d 1
+map_Kd textures/SplayedFoot_Skin.png
+
+newmtl TalonFoot_Claw
+Kd 1 1 1
+d 1
+map_Kd textures/TalonFoot_Claw.png
+
+newmtl TalonFoot_SkinDark
+Kd 1 1 1
+d 1
+map_Kd textures/TalonFoot_SkinDark.png
+
+newmtl HoofFoot_Claw
+Kd 1 1 1
+d 1
+map_Kd textures/HoofFoot_Claw.png
+
+newmtl HoofFoot_Skin
+Kd 1 1 1
+d 1
+map_Kd textures/HoofFoot_Skin.png
+
+newmtl HoofFoot_Void
+Kd 1 1 1
+d 1
+map_Kd textures/HoofFoot_Void.png
+
+newmtl ClawedFoot_Claw
+Kd 1 1 1
+d 1
+map_Kd textures/ClawedFoot_Claw.png
+
+newmtl ClawedFoot_Skin
+Kd 1 1 1
+d 1
+map_Kd textures/ClawedFoot_Skin.png
+
+newmtl Foot_Skin
+Kd 1 1 1
+d 1
+map_Kd textures/Foot_Skin.png
+

@@ -1,0 +1,60 @@
+newmtl NormalArm_Skin
+Kd 1 1 1
+d 1
+map_Kd textures/NormalArm_Skin.png
+
+newmtl MuscularArm_Skin
+Kd 1 1 1
+d 1
+map_Kd textures/MuscularArm_Skin.png
+
+newmtl MuscularArm_SkinDark
+Kd 1 1 1
+d 1
+map_Kd textures/MuscularArm_SkinDark.png
+
+newmtl MuscularArm_SkinLight
+Kd 1 1 1
+d 1
+map_Kd textures/MuscularArm_SkinLight.png
+
+newmtl ThinArm_Skin
+Kd 1 1 1
+d 1
+map_Kd textures/ThinArm_Skin.png
+
+newmtl BoneArm_Bone
+Kd 1 1 1
+d 1
+map_Kd textures/BoneArm_Bone.png
+
+newmtl BoneArm_BoneDark
+Kd 1 1 1
+d 1
+map_Kd textures/BoneArm_BoneDark.png
+
+newmtl BoneArm_SkinDark
+Kd 1 1 1
+d 1
+map_Kd textures/BoneArm_SkinDark.png
+
+newmtl TentacleArm_Flesh
+Kd 1 1 1
+d 1
+map_Kd textures/TentacleArm_Flesh.png
+
+newmtl TentacleArm_Skin
+Kd 1 1 1
+d 1
+map_Kd textures/TentacleArm_Skin.png
+
+newmtl HuskArm_Flesh
+Kd 1 1 1
+d 1
+map_Kd textures/HuskArm_Flesh.png
+
+newmtl HuskArm_Skin
+Kd 1 1 1
+d 1
+map_Kd textures/HuskArm_Skin.png
+

@@ -1,0 +1,142 @@
+newmtl HumanCurseHead_Skin
+Kd 1 1 1
+d 1
+map_Kd textures/HumanCurseHead_Skin.png
+
+newmtl HumanCurseHead_SkinDark
+Kd 1 1 1
+d 1
+map_Kd textures/HumanCurseHead_SkinDark.png
+
+newmtl HumanCurseHead_SkinDeep
+Kd 1 1 1
+d 1
+map_Kd textures/HumanCurseHead_SkinDeep.png
+
+newmtl HumanCurseHead_SkinLight
+Kd 1 1 1
+d 1
+map_Kd textures/HumanCurseHead_SkinLight.png
+
+newmtl BeastHead_Skin
+Kd 1 1 1
+d 1
+map_Kd textures/BeastHead_Skin.png
+
+newmtl BeastHead_SkinDark
+Kd 1 1 1
+d 1
+map_Kd textures/BeastHead_SkinDark.png
+
+newmtl BeastHead_SkinDeep
+Kd 1 1 1
+d 1
+map_Kd textures/BeastHead_SkinDeep.png
+
+newmtl BeastHead_SkinLight
+Kd 1 1 1
+d 1
+map_Kd textures/BeastHead_SkinLight.png
+
+newmtl BeastHead_Teeth
+Kd 1 1 1
+d 1
+map_Kd textures/BeastHead_Teeth.png
+
+newmtl BeastHead_Void
+Kd 1 1 1
+d 1
+map_Kd textures/BeastHead_Void.png
+
+newmtl SkullHead_Bone
+Kd 1 1 1
+d 1
+map_Kd textures/SkullHead_Bone.png
+
+newmtl SkullHead_BoneDark
+Kd 1 1 1
+d 1
+map_Kd textures/SkullHead_BoneDark.png
+
+newmtl SkullHead_Teeth
+Kd 1 1 1
+d 1
+map_Kd textures/SkullHead_Teeth.png
+
+newmtl SkullHead_Void
+Kd 1 1 1
+d 1
+map_Kd textures/SkullHead_Void.png
+
+newmtl MandibleHead_Glow
+Kd 1 1 1
+d 1
+
+newmtl MandibleHead_Skin
+Kd 1 1 1
+d 1
+map_Kd textures/MandibleHead_Skin.png
+
+newmtl MandibleHead_SkinDark
+Kd 1 1 1
+d 1
+map_Kd textures/MandibleHead_SkinDark.png
+
+newmtl MandibleHead_Void
+Kd 1 1 1
+d 1
+map_Kd textures/MandibleHead_Void.png
+
+newmtl FacelessHead_Skin
+Kd 1 1 1
+d 1
+map_Kd textures/FacelessHead_Skin.png
+
+newmtl FacelessHead_SkinDark
+Kd 1 1 1
+d 1
+map_Kd textures/FacelessHead_SkinDark.png
+
+newmtl FacelessHead_SkinLight
+Kd 1 1 1
+d 1
+map_Kd textures/FacelessHead_SkinLight.png
+
+newmtl SplitJawHead_Eye
+Kd 1 1 1
+d 1
+
+newmtl SplitJawHead_Skin
+Kd 1 1 1
+d 1
+map_Kd textures/SplitJawHead_Skin.png
+
+newmtl SplitJawHead_SkinDeep
+Kd 1 1 1
+d 1
+map_Kd textures/SplitJawHead_SkinDeep.png
+
+newmtl SplitJawHead_Teeth
+Kd 1 1 1
+d 1
+map_Kd textures/SplitJawHead_Teeth.png
+
+newmtl SplitJawHead_Void
+Kd 1 1 1
+d 1
+map_Kd textures/SplitJawHead_Void.png
+
+newmtl HuskHead_Claw
+Kd 1 1 1
+d 1
+map_Kd textures/HuskHead_Claw.png
+
+newmtl HuskHead_Eye
+Kd 1 1 1
+d 1
+
+newmtl HuskHead_Skin
+Kd 1 1 1
+d 1
+map_Kd textures/HuskHead_Skin.png
+

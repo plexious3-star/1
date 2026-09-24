@@ -50,6 +50,12 @@ def render(pieces, yaw=0.0, pitch=-6.0, size=(560, 680), center=(0, 2.4, 0), ppu
             col_v = np.clip(base * shade[:, None] + spec[:, None], 0, 1)
             if flat:
                 col_v = np.tile(np.clip(base, 0, 1), (len(V), 1))
+        tex = None if silhouette or piece.get("neon") else piece.get("tex")
+        if tex is not None:
+            UV = piece["uv"]
+            TH, TW = tex.shape[:2]
+            shade_v = np.ones(len(V)) if flat else shade
+            spec_v = np.zeros(len(V)) if flat else spec
         tx, ty, tz = sx[F], sy[F], sz[F]
         x0 = np.clip(np.floor(tx.min(1)).astype(int), 0, w - 1)
         x1 = np.clip(np.ceil(tx.max(1)).astype(int), 0, w - 1)
@@ -77,6 +83,19 @@ def render(pieces, yaw=0.0, pitch=-6.0, size=(560, 680), center=(0, 2.4, 0), ppu
             if not m.any():
                 continue
             sub[m] = z[m]
+            if tex is not None:
+                f = F[i]
+                a0, a1, a2 = l0[m], l1[m], l2[m]
+                u = a0 * UV[f[0], 0] + a1 * UV[f[1], 0] + a2 * UV[f[2], 0]
+                v = a0 * UV[f[0], 1] + a1 * UV[f[1], 1] + a2 * UV[f[2], 1]
+                tx_ = np.clip((u * TW).astype(int), 0, TW - 1)
+                ty_ = np.clip(((1 - v) * TH).astype(int), 0, TH - 1)
+                t = tex[ty_, tx_]
+                alb = base[None, :] * (1 - t[:, 3:4]) + t[:, 0:3] * t[:, 3:4]
+                sh = a0 * shade_v[f[0]] + a1 * shade_v[f[1]] + a2 * shade_v[f[2]]
+                sp = a0 * spec_v[f[0]] + a1 * spec_v[f[1]] + a2 * spec_v[f[2]]
+                img[y0[i]:y1[i] + 1, x0[i]:x1[i] + 1][m] = np.clip(alb * sh[:, None] + sp[:, None], 0, 1)
+                continue
             c = col_v[F[i]]
             col = l0[..., None] * c[0] + l1[..., None] * c[1] + l2[..., None] * c[2]
             img[y0[i]:y1[i] + 1, x0[i]:x1[i] + 1][m] = col[m]

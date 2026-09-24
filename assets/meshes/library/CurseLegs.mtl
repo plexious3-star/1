@@ -1,0 +1,45 @@
+newmtl NormalLeg_Skin
+Kd 1 1 1
+d 1
+map_Kd textures/NormalLeg_Skin.png
+
+newmtl ThinLeg_Skin
+Kd 1 1 1
+d 1
+map_Kd textures/ThinLeg_Skin.png
+
+newmtl MassiveLeg_Skin
+Kd 1 1 1
+d 1
+map_Kd textures/MassiveLeg_Skin.png
+
+newmtl DigitigradeLeg_Skin
+Kd 1 1 1
+d 1
+map_Kd textures/DigitigradeLeg_Skin.png
+
+newmtl DigitigradeLeg_SkinDark
+Kd 1 1 1
+d 1
+map_Kd textures/DigitigradeLeg_SkinDark.png
+
+newmtl HuskLeg_Flesh
+Kd 1 1 1
+d 1
+map_Kd textures/HuskLeg_Flesh.png
+
+newmtl HuskLeg_Skin
+Kd 1 1 1
+d 1
+map_Kd textures/HuskLeg_Skin.png
+
+newmtl SerpentBody_Flesh
+Kd 1 1 1
+d 1
+map_Kd textures/SerpentBody_Flesh.png
+
+newmtl SerpentBody_Skin
+Kd 1 1 1
+d 1
+map_Kd textures/SerpentBody_Skin.png
+

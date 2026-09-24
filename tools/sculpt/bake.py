@@ -22,13 +22,14 @@ ROOT = os.path.dirname(os.path.dirname(HERE))
 sys.path.insert(0, os.path.dirname(HERE))
 from sculpt.sdf import mesh_bone, write_obj  # noqa: E402
 from sculpt import raster  # noqa: E402
+from sculpt import texture  # noqa: E402
 
 
 def safe(name):
     return name.replace(" ", "")
 
 
-def bake(mod, fast=False):
+def bake(mod, fast=False, textured=True):
     sculpt = mod.build()
     out_dir = os.path.join(ROOT, "assets", "meshes", mod.NAME)
     os.makedirs(out_dir, exist_ok=True)
@@ -42,6 +43,9 @@ def bake(mod, fast=False):
         voxel = mod.VOXEL.get(bone, 0.025) * (1.8 if fast else 1.0)
         verts, faces, normals, face_mat = mesh_bone(sculpt, bone, voxel=voxel, max_tris=mod.MAX_TRIS.get(bone, 8000))
         bone_center = np.asarray(mod.BONES[bone], float)
+        border = texture.border_flags(faces, face_mat, len(verts))
+        sdf = (lambda q, b=bone: sculpt.evaluate(b, q)[0])
+        matfn = (lambda q, b=bone: sculpt.evaluate(b, q)[1])
         for mat in sorted(set(face_mat)):
             if not mat:
                 continue
@@ -56,8 +60,17 @@ def bake(mod, fast=False):
             rgb, material, neon = mod.MATERIALS[mat]
             pieces.append(dict(name=name, bone=bone, material=mat, offset=list(np.round(center - bone_center, 4)),
                                size=list(np.round(hi - lo, 4)), tris=int(len(f))))
-            render_pieces.append(dict(verts=verts, faces=f, normals=normals, color=np.array(rgb) / 255, neon=neon,
-                                      gloss=0.35 if mat in ("skin", "flesh") else 0.6, name=name))
+            rp = dict(verts=verts, faces=f, normals=normals, color=np.array(rgb) / 255, neon=neon,
+                      gloss=0.35 if mat in ("skin", "flesh") else 0.6, name=name)
+            if textured:
+                vmap, idx, uvs, img = texture.bake_piece(verts, normals, f, border, mat, sdf, matfn=matfn)
+                if img is not None:
+                    tex_dir = os.path.join(out_dir, "textures")
+                    os.makedirs(tex_dir, exist_ok=True)
+                    img.save(os.path.join(tex_dir, name + ".png"))
+                    rp.update(verts=verts[vmap], normals=normals[vmap], faces=idx, uv=uvs,
+                              tex=np.asarray(img.transpose(Image.FLIP_TOP_BOTTOM).transpose(Image.FLIP_TOP_BOTTOM), float) / 255)
+            render_pieces.append(rp)
             combined.append((name, verts, normals, f))
         print(f"  {bone:10s} {len(faces):6d} tris  ({time.time() - t0:.1f}s)")
     # single-file import (world rest space)
@@ -163,6 +176,6 @@ def previews(mod, pieces):
 
 if __name__ == "__main__":
     mod = importlib.import_module("sculpt." + sys.argv[1])
-    manifest, pieces = bake(mod, fast="--fast" in sys.argv)
+    manifest, pieces = bake(mod, fast="--fast" in sys.argv, textured="--no-texture" not in sys.argv)
     if "--no-render" not in sys.argv:
         previews(mod, pieces)

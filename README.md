@@ -39,14 +39,29 @@ Design: [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md).
    2. Import every `assets/meshes/library/Curse*.obj` with the 3D Importer (File Dimensions: Studs).
    3. Move the imported models into `CurseAssets`.
 
-   Each OBJ holds many named objects (`HuskHead_Skin`, `RamHorn_Bone_L`, …). The
-   framework finds MeshParts by name anywhere under that folder and resizes them
-   itself.
+   Each OBJ holds many named objects (`HuskHead_Skin`, `RamHorn_Bone_L`, …). Its
+   `.mtl` file and the `textures/` folder must stay next to it, so the importer
+   uploads each texture and sets it as the MeshPart's `TextureID`. The framework
+   finds MeshParts by name anywhere under that folder and resizes them itself.
 3. **Avatar.** Set Game Settings → Avatar → Avatar Type to **R6**.
 4. **Try it.** Press Play. In Studio a gallery of every preset spawns near the world origin.
 
 If the importer changes the mesh axes (parts show up rotated), set
 `CurseBody.Builder.MESH_ROTATION` to the correcting CFrame.
+
+## Textures
+
+The textures are hand-drawn-style **overlays** baked from the sculpts:
+
+- ink hatching that thickens in shadowed creases, cross-hatched in the deepest ones
+- white gloss dashes on exposed bulges
+- veins, mottling and pores on skin
+- striations on exposed tissue, grain and cracks on bone
+- black ink lines tracing the borders between skin and tissue
+
+They are black and white with transparency. Roblox shows a MeshPart's `Color`
+through the transparent texels, so the hue still comes from the Curse's palette:
+the same textures work on crimson, pale, bruise or custom palettes.
 
 ## Use
 
@@ -95,8 +110,8 @@ It's now equippable, grade-gated, usable in transformations and listed by
 
 | Path | |
 |---|---|
-| `tools/sculpt/` | sculpting engine (`sdf.py`), mesh library (`library.py`), reference creature parts (`husk.py`), baker + previews (`bake.py`) |
-| `assets/meshes/library/` | baked library: one OBJ per slot + `Library.json` |
+| `tools/sculpt/` | sculpting engine (`sdf.py`), texture baker (`texture.py`), mesh library (`library.py`), reference creature parts (`husk.py`), baker + previews (`bake.py`) |
+| `assets/meshes/library/` | baked library: one OBJ + MTL per slot, `textures/` (PNG overlays), `Library.json` |
 | `src/shared/CurseBody/` | runtime framework; `Meshes/Library.lua` is the generated manifest |
 | `src/server/`, `src/client/` | CurseService (profiles, grade checks, forms), CurseClient (sway, extra-limb motion, grow-in) |
 | `tests/` | mocked Roblox API, headless tests, renders of what the framework assembles |
@@ -105,8 +120,8 @@ It's now equippable, grade-gated, usable in transformations and listed by
 ## Rebuild and test
 
 ```
-pip install numpy pillow scipy scikit-image fast-simplification
-python3 tools/sculpt/library.py            # re-bake the mesh library (~3 min)
+pip install numpy pillow scipy scikit-image fast-simplification xatlas
+python3 tools/sculpt/library.py            # re-bake meshes + textures (~15 min)
 python3 tools/sculpt/bake.py husk          # reference-creature comparison previews
 LUAU=/path/to/luau python3 tests/run.py    # framework tests + renders
 ```

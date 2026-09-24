@@ -19,29 +19,23 @@ _LIB = None
 
 
 def library():
+    """name → (verts, normals, faces, extent, uv, texture) from the baked library OBJs."""
     global _LIB
     if _LIB is None:
         _LIB = {}
-        for path in glob.glob(os.path.join(ROOT, "assets", "meshes", "library", "*.obj")):
-            name, V, N, F, off = None, [], [], [], 0
-            objs = []
-            for line in open(path):
-                if line.startswith("o "):
-                    if name:
-                        objs.append((name, V, N, F))
-                    name, V, N, F = line[2:].strip(), [], [], []
-                elif line.startswith("v "):
-                    V.append(tuple(map(float, line.split()[1:])))
-                elif line.startswith("vn "):
-                    N.append(tuple(map(float, line.split()[1:])))
-                elif line.startswith("f "):
-                    F.append([int(t.split("//")[0]) for t in line.split()[1:]])
-            if name:
-                objs.append((name, V, N, F))
-            for name, V, N, F in objs:
-                V, N, F = np.array(V), np.array(N), np.array(F) - 1
-                F = F - F.min()
-                _LIB[name] = (V, N, F, V.max(0) - V.min(0))
+        sys.path.insert(0, os.path.join(ROOT, "tools"))
+        from sculpt.library import read_objects
+        lib_dir = os.path.join(ROOT, "assets", "meshes", "library")
+        textures = {}
+        for path in glob.glob(os.path.join(lib_dir, "*.obj")):
+            for o in read_objects(path):
+                tex = None
+                if o.get("tex"):
+                    if o["tex"] not in textures:
+                        textures[o["tex"]] = np.asarray(Image.open(os.path.join(lib_dir, "textures", o["tex"])).convert("RGBA"), float) / 255
+                    tex = textures[o["tex"]]
+                V = o["v"]
+                _LIB[o["name"]] = (V, o["n"], o["f"], V.max(0) - V.min(0), o["uv"] if len(o["uv"]) else None, tex)
     return _LIB
 
 
@@ -51,7 +45,7 @@ def to_pieces(parts):
     for p in parts:
         if p["s"] != "Mesh" or p.get("mesh") not in lib:
             continue
-        V, N, F, ext = lib[p["mesh"]]
+        V, N, F, ext, uv, tex = lib[p["mesh"]]
         x, y, z, *r = p["cf"]
         R = np.array(r, float).reshape(3, 3)
         k = np.array(p["sz"]) / np.maximum(ext, 1e-6)
@@ -59,7 +53,7 @@ def to_pieces(parts):
         normals = (N / np.maximum(k, 1e-6)) @ R.T
         normals /= np.maximum(np.linalg.norm(normals, axis=1, keepdims=True), 1e-9)
         out.append(dict(verts=verts, faces=F, normals=normals, color=p["c"], neon=p["m"] == "Neon",
-                        gloss=0.3))
+                        gloss=0.3, uv=uv, tex=tex))
     return out
 
 

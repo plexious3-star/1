@@ -1,0 +1,67 @@
+newmtl Eye_Eye
+Kd 1 1 1
+d 1
+
+newmtl Eye_Pupil
+Kd 1 1 1
+d 1
+
+newmtl Eye_Skin
+Kd 1 1 1
+d 1
+map_Kd textures/Eye_Skin.png
+
+newmtl Eye_SkinDark
+Kd 1 1 1
+d 1
+map_Kd textures/Eye_SkinDark.png
+
+newmtl GiantEye_Eye
+Kd 1 1 1
+d 1
+
+newmtl GiantEye_Glow
+Kd 1 1 1
+d 1
+
+newmtl GiantEye_Pupil
+Kd 1 1 1
+d 1
+
+newmtl GiantEye_Skin
+Kd 1 1 1
+d 1
+map_Kd textures/GiantEye_Skin.png
+
+newmtl GiantEye_SkinDark
+Kd 1 1 1
+d 1
+map_Kd textures/GiantEye_SkinDark.png
+
+newmtl GlowPoint_Glow
+Kd 1 1 1
+d 1
+
+newmtl EyeCluster_Eye
+Kd 1 1 1
+d 1
+
+newmtl EyeCluster_Pupil
+Kd 1 1 1
+d 1
+
+newmtl EyeCluster_Skin
+Kd 1 1 1
+d 1
+map_Kd textures/EyeCluster_Skin.png
+
+newmtl EyeCluster_SkinDark
+Kd 1 1 1
+d 1
+map_Kd textures/EyeCluster_SkinDark.png
+
+newmtl CompoundEye_Void
+Kd 1 1 1
+d 1
+map_Kd textures/CompoundEye_Void.png
+

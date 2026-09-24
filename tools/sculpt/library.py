@@ -31,6 +31,7 @@ HERE = os.path.dirname(os.path.abspath(__file__))
 ROOT = os.path.dirname(os.path.dirname(HERE))
 sys.path.insert(0, os.path.dirname(HERE))
 from sculpt import husk  # noqa: E402
+from sculpt import texture  # noqa: E402
 from sculpt.sdf import (Prim, Sculpt, bezier_points, ellipsoid, mesh_bone, rot_matrix, round_cone,  # noqa: E402
                         sphere, squashed, torus, tube)
 
@@ -953,6 +954,9 @@ def bake_all(only=None, fast=False, render=True):
         verts, faces, normals, face_mat = mesh_bone(S, cid, voxel=voxel, max_tris=c.get("tris", 4000), smooth_iters=8)
         roles = c.get("roles", {})
         pieces, meshes = [], []
+        border = texture.border_flags(faces, face_mat, len(verts))
+        sdf = (lambda q, b=cid, S=S: S.evaluate(b, q)[0])
+        matfn = (lambda q, b=cid, S=S: S.evaluate(b, q)[1])
         for mat in sorted(set(face_mat)):
             if not mat:
                 continue
@@ -960,31 +964,30 @@ def bake_all(only=None, fast=False, render=True):
             if len(f) < 4:
                 continue
             role = roles.get(mat, mat)
-            used = np.unique(f)
-            lo, hi = verts[used].min(0), verts[used].max(0)
-            center = (lo + hi) / 2
             pname = f"{cid}_{role}"
-            # merge pieces that map to the same role (e.g. two source materials → Claw)
-            existing = next((m for m in meshes if m[0] == pname), None)
-            if existing:
-                f = np.concatenate([existing[3], f])
-                used = np.unique(f)
-                lo, hi = verts[used].min(0), verts[used].max(0)
-                center = (lo + hi) / 2
-                meshes.remove(existing)
-                pieces = [p for p in pieces if p["name"] != pname]
-            pieces.append(dict(name=pname, role=role, offset=list(np.round(center, 4)), size=list(np.round(hi - lo, 4)), tris=int(len(f))))
-            meshes.append((pname, verts, normals, f, center))
+            while any(p["name"] == pname for p in pieces):
+                pname += "2"
+            vmap, idx, uvs, img = texture.bake_piece(verts, normals, f, border, mat, sdf, matfn=matfn)
+            tex = None
+            if img is not None:
+                os.makedirs(os.path.join(out_dir, "textures"), exist_ok=True)
+                tex = pname + ".png"
+                img.save(os.path.join(out_dir, "textures", tex), optimize=True)
+            V, N = verts[vmap], normals[vmap]
+            lo, hi = V.min(0), V.max(0)
+            center = (lo + hi) / 2
+            pieces.append(dict(name=pname, role=role, offset=list(np.round(center, 4)), size=list(np.round(hi - lo, 4)),
+                               tris=int(len(idx)), texture=tex))
+            meshes.append(dict(name=pname, v=V - center, n=N, f=idx, uv=uvs, mtl=pname, tex=tex, center=center))
         cat = c["slot"]
         by_category.setdefault(cat, [])
-        by_category[cat] = [m for m in by_category[cat] if not m[0].startswith(cid + "_")]
+        by_category[cat] = [m for m in by_category[cat] if not m["name"].startswith(cid + "_")]
         for m in meshes:
             by_category[cat].append(m)
             if c.get("sided"):
-                name, v, n, f, center = m
-                vm = v * np.array((-1, 1, 1))
-                nm = n * np.array((-1, 1, 1))
-                by_category[cat].append((name + "_L", vm, nm, f[:, ::-1], center * np.array((-1, 1, 1))))
+                # mirrored left piece: same UVs, same texture
+                by_category[cat].append(dict(m, name=m["name"] + "_L", v=m["v"] * np.array((-1, 1, 1)),
+                                             n=m["n"] * np.array((-1, 1, 1)), f=m["f"][:, ::-1]))
         entry = {k: c[k] for k in ("slot", "grade", "space") if k in c}
         for k in ("tags", "sockets", "layout", "variants", "defaults", "pivot", "span", "socket", "count", "slots", "hidden",
                   "legExtra", "joint"):
@@ -993,7 +996,8 @@ def bake_all(only=None, fast=False, render=True):
         entry["sided"] = bool(c.get("sided"))
         entry["pieces"] = pieces
         manifest["components"][cid] = entry
-        previews[cid] = [dict(verts=m[1], faces=m[3], normals=m[2], color=ROLE_PREVIEW.get(p["role"], (0.6, 0.2, 0.2)),
+        previews[cid] = [dict(verts=m["v"] + m["center"], faces=m["f"], normals=m["n"], uv=m["uv"],
+                              tex=load_tex(out_dir, m["tex"]), color=ROLE_PREVIEW.get(p["role"], (0.6, 0.2, 0.2)),
                               neon=p["role"] in ("Eye", "Glow")) for m, p in zip(meshes, pieces)]
         print(f"  {cid:20s} {sum(p['tris'] for p in pieces):6d} tris {len(pieces)} pieces ({time.time() - t0:.1f}s)")
 
@@ -1021,49 +1025,77 @@ ROLE_PREVIEW = {
 }
 
 
+def load_tex(out_dir, name):
+    if not name:
+        return None
+    from PIL import Image
+    return np.asarray(Image.open(os.path.join(out_dir, "textures", name)).convert("RGBA"), float) / 255
+
+
 def write_category(path, meshes, merge=False):
-    existing = {}
+    """One OBJ (+ MTL) per slot. Objects are centered on themselves; textures live in textures/."""
+    names = {m["name"] for m in meshes}
+    items = []
     if merge and os.path.exists(path):
-        existing = read_objects(path)
-    names = {m[0] for m in meshes}
+        items = [m for m in read_objects(path) if m["name"] not in names]
+    items += meshes
+    base = os.path.splitext(path)[0]
+    mtl_name = os.path.basename(base) + ".mtl"
+    with open(base + ".mtl", "w") as fh:
+        seen = set()
+        for m in items:
+            if m["mtl"] in seen:
+                continue
+            seen.add(m["mtl"])
+            fh.write(f"newmtl {m['mtl']}\nKd 1 1 1\nd 1\n")
+            if m.get("tex"):
+                fh.write(f"map_Kd textures/{m['tex']}\n")
+            fh.write("\n")
     with open(path, "w") as fh:
-        base = 1
-        items = [(n, o) for n, o in existing.items() if n not in names]
-        for name, o in items:
-            fh.write(f"o {name}\n")
-            fh.write("".join(f"v {a:.4f} {b:.4f} {c:.4f}\n" for a, b, c in o["v"]))
-            fh.write("".join(f"vn {a:.4f} {b:.4f} {c:.4f}\n" for a, b, c in o["vn"]))
-            fh.write("".join(f"f {a + base}//{a + base} {b + base}//{b + base} {c + base}//{c + base}\n" for a, b, c in o["f"]))
-            base += len(o["v"])
-        for name, verts, normals, f, center in meshes:
-            used = np.unique(f)
-            remap = -np.ones(len(verts), dtype=int)
-            remap[used] = np.arange(len(used))
-            v = verts[used] - center
-            ff = remap[f] + base
-            fh.write(f"o {name}\n")
-            fh.write("".join(f"v {a:.4f} {b:.4f} {c:.4f}\n" for a, b, c in v))
-            fh.write("".join(f"vn {a:.4f} {b:.4f} {c:.4f}\n" for a, b, c in normals[used]))
-            fh.write("".join(f"f {a}//{a} {b}//{b} {c}//{c}\n" for a, b, c in ff))
-            base += len(used)
+        fh.write(f"mtllib {mtl_name}\n")
+        vbase = 1
+        for m in items:
+            fh.write(f"o {m['name']}\nusemtl {m['mtl']}\n")
+            fh.write("".join(f"v {a:.4f} {b:.4f} {c:.4f}\n" for a, b, c in m["v"]))
+            fh.write("".join(f"vt {a:.5f} {b:.5f}\n" for a, b in m["uv"]))
+            fh.write("".join(f"vn {a:.4f} {b:.4f} {c:.4f}\n" for a, b, c in m["n"]))
+            ff = m["f"] + vbase
+            fh.write("".join(f"f {a}/{a}/{a} {b}/{b}/{b} {c}/{c}/{c}\n" for a, b, c in ff))
+            vbase += len(m["v"])
 
 
 def read_objects(path):
-    """Parse an OBJ written by write_category back into objects (vertices local to each object)."""
-    objs, cur, voff = {}, None, 0
-    total_v = 0
+    """Parse an OBJ written by write_category back into objects (local indices)."""
+    mtl_tex = {}
+    mtl_path = os.path.splitext(path)[0] + ".mtl"
+    if os.path.exists(mtl_path):
+        cur = None
+        for line in open(mtl_path):
+            if line.startswith("newmtl "):
+                cur = line.split()[1]
+                mtl_tex[cur] = None
+            elif line.startswith("map_Kd ") and cur:
+                mtl_tex[cur] = os.path.basename(line.split()[1])
+    objs, cur, vcount = [], None, 0
     for line in open(path):
         if line.startswith("o "):
-            cur = line[2:].strip()
-            objs[cur] = dict(v=[], vn=[], f=[], base=total_v)
+            cur = dict(name=line[2:].strip(), v=[], uv=[], n=[], f=[], base=vcount, mtl=None)
+            objs.append(cur)
+        elif line.startswith("usemtl "):
+            cur["mtl"] = line.split()[1]
+            cur["tex"] = mtl_tex.get(cur["mtl"])
         elif line.startswith("v "):
-            objs[cur]["v"].append(tuple(map(float, line.split()[1:])))
-            total_v += 1
+            cur["v"].append(tuple(map(float, line.split()[1:])))
+            vcount += 1
+        elif line.startswith("vt "):
+            cur["uv"].append(tuple(map(float, line.split()[1:3])))
         elif line.startswith("vn "):
-            objs[cur]["vn"].append(tuple(map(float, line.split()[1:])))
+            cur["n"].append(tuple(map(float, line.split()[1:])))
         elif line.startswith("f "):
-            idx = [int(t.split("//")[0]) - 1 - objs[cur]["base"] for t in line.split()[1:]]
-            objs[cur]["f"].append(tuple(idx))
+            cur["f"].append([int(t.split("/")[0]) - 1 - cur["base"] for t in line.split()[1:]])
+    for o in objs:
+        for k in ("v", "uv", "n", "f"):
+            o[k] = np.array(o[k])
     return objs
 
 

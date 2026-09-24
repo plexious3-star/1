@@ -1,0 +1,125 @@
+newmtl StubHorn_Bone
+Kd 1 1 1
+d 1
+map_Kd textures/StubHorn_Bone.png
+
+newmtl StubHorn_BoneDark
+Kd 1 1 1
+d 1
+map_Kd textures/StubHorn_BoneDark.png
+
+newmtl StubHorn_Skin
+Kd 1 1 1
+d 1
+map_Kd textures/StubHorn_Skin.png
+
+newmtl StraightHorn_Bone
+Kd 1 1 1
+d 1
+map_Kd textures/StraightHorn_Bone.png
+
+newmtl StraightHorn_BoneDark
+Kd 1 1 1
+d 1
+map_Kd textures/StraightHorn_BoneDark.png
+
+newmtl StraightHorn_Skin
+Kd 1 1 1
+d 1
+map_Kd textures/StraightHorn_Skin.png
+
+newmtl CurvedHorn_Bone
+Kd 1 1 1
+d 1
+map_Kd textures/CurvedHorn_Bone.png
+
+newmtl CurvedHorn_BoneDark
+Kd 1 1 1
+d 1
+map_Kd textures/CurvedHorn_BoneDark.png
+
+newmtl CurvedHorn_Skin
+Kd 1 1 1
+d 1
+map_Kd textures/CurvedHorn_Skin.png
+
+newmtl BackHorn_Bone
+Kd 1 1 1
+d 1
+map_Kd textures/BackHorn_Bone.png
+
+newmtl BackHorn_BoneDark
+Kd 1 1 1
+d 1
+map_Kd textures/BackHorn_BoneDark.png
+
+newmtl BackHorn_Claw
+Kd 1 1 1
+d 1
+map_Kd textures/BackHorn_Claw.png
+
+newmtl BackHorn_Skin
+Kd 1 1 1
+d 1
+map_Kd textures/BackHorn_Skin.png
+
+newmtl RamHorn_Bone
+Kd 1 1 1
+d 1
+map_Kd textures/RamHorn_Bone.png
+
+newmtl RamHorn_BoneDark
+Kd 1 1 1
+d 1
+map_Kd textures/RamHorn_BoneDark.png
+
+newmtl RamHorn_Skin
+Kd 1 1 1
+d 1
+map_Kd textures/RamHorn_Skin.png
+
+newmtl Antler_BoneDark
+Kd 1 1 1
+d 1
+map_Kd textures/Antler_BoneDark.png
+
+newmtl Antler_Skin
+Kd 1 1 1
+d 1
+map_Kd textures/Antler_Skin.png
+
+newmtl BrokenHorn_Bone
+Kd 1 1 1
+d 1
+map_Kd textures/BrokenHorn_Bone.png
+
+newmtl BrokenHorn_BoneDark
+Kd 1 1 1
+d 1
+map_Kd textures/BrokenHorn_BoneDark.png
+
+newmtl BrokenHorn_Skin
+Kd 1 1 1
+d 1
+map_Kd textures/BrokenHorn_Skin.png
+
+newmtl MassiveHorn_Bone
+Kd 1 1 1
+d 1
+map_Kd textures/MassiveHorn_Bone.png
+
+newmtl MassiveHorn_BoneDark
+Kd 1 1 1
+d 1
+map_Kd textures/MassiveHorn_BoneDark.png
+
+newmtl MassiveHorn_Claw
+Kd 1 1 1
+d 1
+map_Kd textures/MassiveHorn_Claw.png
+
+newmtl MassiveHorn_Skin
+Kd 1 1 1
+d 1
+map_Kd textures/MassiveHorn_Skin.png
+

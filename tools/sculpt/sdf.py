@@ -279,7 +279,7 @@ def mesh_bone(sculpt, bone, voxel=0.03, max_tris=9000, smooth_iters=10):
     vol = d.reshape(shape)
     verts, faces, _, _ = measure.marching_cubes(vol, level=0.0, spacing=(voxel,) * 3)
     verts = verts + lo
-    faces = faces[:, ::-1].copy()  # outward winding (counter-clockwise from outside)
+    # skimage's winding already faces out of the solid (toward positive distance): keep it
     verts = _taubin(verts, faces, iters=smooth_iters)
     if len(faces) > max_tris:
         verts, faces = fast_simplification.simplify(verts.astype(np.float32), faces.astype(np.int32),

@@ -1,0 +1,10 @@
+newmtl RibGrowth_Bone
+Kd 1 1 1
+d 1
+map_Kd textures/RibGrowth_Bone.png
+
+newmtl RibGrowth_Flesh
+Kd 1 1 1
+d 1
+map_Kd textures/RibGrowth_Flesh.png
+

@@ -1,0 +1,65 @@
+newmtl Fist_Claw
+Kd 1 1 1
+d 1
+map_Kd textures/Fist_Claw.png
+
+newmtl Fist_Skin
+Kd 1 1 1
+d 1
+map_Kd textures/Fist_Skin.png
+
+newmtl ClawedHand_Claw
+Kd 1 1 1
+d 1
+map_Kd textures/ClawedHand_Claw.png
+
+newmtl ClawedHand_Skin
+Kd 1 1 1
+d 1
+map_Kd textures/ClawedHand_Skin.png
+
+newmtl ClawedHand_SkinLight
+Kd 1 1 1
+d 1
+map_Kd textures/ClawedHand_SkinLight.png
+
+newmtl BladedHand_Claw
+Kd 1 1 1
+d 1
+map_Kd textures/BladedHand_Claw.png
+
+newmtl BladedHand_Skin
+Kd 1 1 1
+d 1
+map_Kd textures/BladedHand_Skin.png
+
+newmtl BladedHand_SkinLight
+Kd 1 1 1
+d 1
+map_Kd textures/BladedHand_SkinLight.png
+
+newmtl TalonHand_Claw
+Kd 1 1 1
+d 1
+map_Kd textures/TalonHand_Claw.png
+
+newmtl TalonHand_Skin
+Kd 1 1 1
+d 1
+map_Kd textures/TalonHand_Skin.png
+
+newmtl TalonHand_SkinLight
+Kd 1 1 1
+d 1
+map_Kd textures/TalonHand_SkinLight.png
+
+newmtl OpenHand_Skin
+Kd 1 1 1
+d 1
+map_Kd textures/OpenHand_Skin.png
+
+newmtl OpenHand_SkinLight
+Kd 1 1 1
+d 1
+map_Kd textures/OpenHand_SkinLight.png
+

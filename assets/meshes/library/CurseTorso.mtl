@@ -1,0 +1,135 @@
+newmtl NormalTorso_Skin
+Kd 1 1 1
+d 1
+map_Kd textures/NormalTorso_Skin.png
+
+newmtl NormalTorso_SkinLight
+Kd 1 1 1
+d 1
+map_Kd textures/NormalTorso_SkinLight.png
+
+newmtl NormalTorsoOpen_Bone
+Kd 1 1 1
+d 1
+map_Kd textures/NormalTorsoOpen_Bone.png
+
+newmtl NormalTorsoOpen_Skin
+Kd 1 1 1
+d 1
+map_Kd textures/NormalTorsoOpen_Skin.png
+
+newmtl NormalTorsoOpen_SkinLight
+Kd 1 1 1
+d 1
+map_Kd textures/NormalTorsoOpen_SkinLight.png
+
+newmtl NormalTorsoOpen_Void
+Kd 1 1 1
+d 1
+map_Kd textures/NormalTorsoOpen_Void.png
+
+newmtl MuscularTorso_Skin
+Kd 1 1 1
+d 1
+map_Kd textures/MuscularTorso_Skin.png
+
+newmtl MuscularTorso_SkinLight
+Kd 1 1 1
+d 1
+map_Kd textures/MuscularTorso_SkinLight.png
+
+newmtl MuscularTorsoOpen_Bone
+Kd 1 1 1
+d 1
+map_Kd textures/MuscularTorsoOpen_Bone.png
+
+newmtl MuscularTorsoOpen_Skin
+Kd 1 1 1
+d 1
+map_Kd textures/MuscularTorsoOpen_Skin.png
+
+newmtl MuscularTorsoOpen_SkinLight
+Kd 1 1 1
+d 1
+map_Kd textures/MuscularTorsoOpen_SkinLight.png
+
+newmtl MuscularTorsoOpen_Void
+Kd 1 1 1
+d 1
+map_Kd textures/MuscularTorsoOpen_Void.png
+
+newmtl EmaciatedTorso_Skin
+Kd 1 1 1
+d 1
+map_Kd textures/EmaciatedTorso_Skin.png
+
+newmtl EmaciatedTorso_SkinLight
+Kd 1 1 1
+d 1
+map_Kd textures/EmaciatedTorso_SkinLight.png
+
+newmtl EmaciatedTorsoOpen_Bone
+Kd 1 1 1
+d 1
+map_Kd textures/EmaciatedTorsoOpen_Bone.png
+
+newmtl EmaciatedTorsoOpen_Skin
+Kd 1 1 1
+d 1
+map_Kd textures/EmaciatedTorsoOpen_Skin.png
+
+newmtl EmaciatedTorsoOpen_SkinLight
+Kd 1 1 1
+d 1
+map_Kd textures/EmaciatedTorsoOpen_SkinLight.png
+
+newmtl EmaciatedTorsoOpen_Void
+Kd 1 1 1
+d 1
+map_Kd textures/EmaciatedTorsoOpen_Void.png
+
+newmtl MassiveTorso_Skin
+Kd 1 1 1
+d 1
+map_Kd textures/MassiveTorso_Skin.png
+
+newmtl MassiveTorso_SkinLight
+Kd 1 1 1
+d 1
+map_Kd textures/MassiveTorso_SkinLight.png
+
+newmtl MassiveTorsoOpen_Bone
+Kd 1 1 1
+d 1
+map_Kd textures/MassiveTorsoOpen_Bone.png
+
+newmtl MassiveTorsoOpen_Skin
+Kd 1 1 1
+d 1
+map_Kd textures/MassiveTorsoOpen_Skin.png
+
+newmtl MassiveTorsoOpen_SkinLight
+Kd 1 1 1
+d 1
+map_Kd textures/MassiveTorsoOpen_SkinLight.png
+
+newmtl MassiveTorsoOpen_Void
+Kd 1 1 1
+d 1
+map_Kd textures/MassiveTorsoOpen_Void.png
+
+newmtl HuskTorso_Flesh
+Kd 1 1 1
+d 1
+map_Kd textures/HuskTorso_Flesh.png
+
+newmtl HuskTorso_Skin
+Kd 1 1 1
+d 1
+map_Kd textures/HuskTorso_Skin.png
+
+newmtl HuskTorso_Void
+Kd 1 1 1
+d 1
+map_Kd textures/HuskTorso_Void.png
+

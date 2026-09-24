@@ -1,0 +1,78 @@
+newmtl Tumor_Flesh
+Kd 1 1 1
+d 1
+map_Kd textures/Tumor_Flesh.png
+
+newmtl Tumor_Skin
+Kd 1 1 1
+d 1
+map_Kd textures/Tumor_Skin.png
+
+newmtl Tumor_SkinDark
+Kd 1 1 1
+d 1
+map_Kd textures/Tumor_SkinDark.png
+
+newmtl Tumor_SkinLight
+Kd 1 1 1
+d 1
+map_Kd textures/Tumor_SkinLight.png
+
+newmtl BoneSpur_Bone
+Kd 1 1 1
+d 1
+map_Kd textures/BoneSpur_Bone.png
+
+newmtl BoneSpur_BoneDark
+Kd 1 1 1
+d 1
+map_Kd textures/BoneSpur_BoneDark.png
+
+newmtl BoneSpur_Skin
+Kd 1 1 1
+d 1
+map_Kd textures/BoneSpur_Skin.png
+
+newmtl BoneProtrusion_Bone
+Kd 1 1 1
+d 1
+map_Kd textures/BoneProtrusion_Bone.png
+
+newmtl BoneProtrusion_BoneDark
+Kd 1 1 1
+d 1
+map_Kd textures/BoneProtrusion_BoneDark.png
+
+newmtl BoneProtrusion_Flesh
+Kd 1 1 1
+d 1
+map_Kd textures/BoneProtrusion_Flesh.png
+
+newmtl BoneProtrusion_SkinDark
+Kd 1 1 1
+d 1
+map_Kd textures/BoneProtrusion_SkinDark.png
+
+newmtl CrackedFlesh_Glow
+Kd 1 1 1
+d 1
+
+newmtl CrackedFlesh_Skin
+Kd 1 1 1
+d 1
+map_Kd textures/CrackedFlesh_Skin.png
+
+newmtl CrackedFlesh_VoidRim
+Kd 1 1 1
+d 1
+
+newmtl ExtraEar_SkinDark
+Kd 1 1 1
+d 1
+map_Kd textures/ExtraEar_SkinDark.png
+
+newmtl ExtraEar_SkinDeep
+Kd 1 1 1
+d 1
+map_Kd textures/ExtraEar_SkinDeep.png
+

@@ -23,6 +23,7 @@ physics, ragdoll and hitboxes keep working.
 | Path | Role |
 |---|---|
 | `tools/sculpt/sdf.py` | sculpting engine: SDF primitives, smooth blending, carving, material painting, meshing |
+| `tools/sculpt/texture.py` | UV unwrapping (xatlas) + procedural hand-drawn texture overlays baked from the sculpt |
 | `tools/sculpt/library.py` | every modular component, sculpted in its own local space → `assets/meshes/library/*.obj` + manifest |
 | `tools/sculpt/husk.py` | the reference creature's parts (shared with the library as `Husk*` components) |
 | `src/shared/CurseBody/` | runtime framework (`ReplicatedStorage.CurseBody`) |
@@ -118,7 +119,10 @@ to. `Catalog/Meshes.lua` knows how to place and scale each space:
 | `serpent` | the Torso (replaces the legs) | TorsoW |
 
 Each piece is a MeshPart cloned from `CurseAssets`, resized, colored by its
-palette **role**, and welded to one bone (`Weld.C0` = offset). Pieces are
+palette **role**, and welded to one bone (`Weld.C0` = offset). Its texture is an
+overlay (ink hatching, gloss, veins, tissue striations, border ink) with alpha.
+The part's palette `Color` shows through the transparent texels, so textures
+never lock a Curse's colors. Pieces are
 massless and don't collide, so nothing spans two bones or blocks a joint.
 Meshes overlap generously at the joints: the arm's deltoid sinks into the
 torso's shoulder mass, and the head's neck plug into the neck wrap. Rotating a

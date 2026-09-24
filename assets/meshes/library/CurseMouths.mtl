@@ -1,0 +1,45 @@
+newmtl GrinMouth_Skin
+Kd 1 1 1
+d 1
+map_Kd textures/GrinMouth_Skin.png
+
+newmtl GrinMouth_SkinDark
+Kd 1 1 1
+d 1
+map_Kd textures/GrinMouth_SkinDark.png
+
+newmtl GrinMouth_Teeth
+Kd 1 1 1
+d 1
+map_Kd textures/GrinMouth_Teeth.png
+
+newmtl Maw_Skin
+Kd 1 1 1
+d 1
+map_Kd textures/Maw_Skin.png
+
+newmtl Maw_SkinDark
+Kd 1 1 1
+d 1
+map_Kd textures/Maw_SkinDark.png
+
+newmtl Maw_Teeth
+Kd 1 1 1
+d 1
+map_Kd textures/Maw_Teeth.png
+
+newmtl Mandibles_Claw
+Kd 1 1 1
+d 1
+map_Kd textures/Mandibles_Claw.png
+
+newmtl Mandibles_SkinDark
+Kd 1 1 1
+d 1
+map_Kd textures/Mandibles_SkinDark.png
+
+newmtl Mandibles_Teeth
+Kd 1 1 1
+d 1
+map_Kd textures/Mandibles_Teeth.png
+
