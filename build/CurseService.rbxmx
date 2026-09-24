@@ -1,0 +1,267 @@
+<roblox xmlns:xmime="http://www.w3.org/2005/05/xmlmime" version="4"><Item class="Script" referent="RBX20"><Properties><string name="Name">CurseService</string><ProtectedString name="Source"><![CDATA[--!nonstrict
+--[[
+	CurseService — server runtime for player Curses.
+
+	• Loads each player's profile (stats + appearance) from a DataStore.
+	• Computes the grade from progression stats (CurseBody.Grades.compute).
+	• Builds the Curse body on every spawn, server-side, so everyone sees it.
+	• Handles client requests through ReplicatedStorage.CurseRemotes:
+	    RequestForm(stage)          → transformation, grade-checked, timed
+	    SaveAppearance(appearance)  → sanitized against the grade, saved, rebuilt
+	    GetCatalog()                → components per slot with lock state (for UI)
+	• Ragdolls on death without breaking the body apart.
+
+	Requires the game's avatar type to be R6 (Game Settings → Avatar).
+]]
+
+local Players = game:GetService("Players")
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
+local DataStoreService = game:GetService("DataStoreService")
+local RunService = game:GetService("RunService")
+
+local CurseBody = require(ReplicatedStorage:WaitForChild("CurseBody"))
+local Grades, Registry, Slots, Util = CurseBody.Grades, CurseBody.Registry, CurseBody.Slots, CurseBody.Util
+
+local CONFIG = {
+	DATASTORE = "CurseProfiles_v1",
+	STARTER_PRESET = "Grub",
+	FORM_DURATION = { Partial = 45, Full = 25 }, -- seconds before reverting to Base
+	FORM_COOLDOWN = 10,
+	SPAWN_PRESET_GALLERY = RunService:IsStudio(), -- NPC lineup of every preset (Studio only)
+}
+
+local store = nil
+pcall(function()
+	store = DataStoreService:GetDataStore(CONFIG.DATASTORE)
+end)
+
+local profiles = {} -- player → profile
+local formState = {} -- player → { stage, token, readyAt }
+
+local function defaultProfile(player)
+	local starter = CurseBody.Presets[CONFIG.STARTER_PRESET]
+	local appearance = Util.deepCopy(starter.appearance)
+	appearance.Seed = player.UserId % 100000
+	return { Version = 1, Stats = { CursedEnergy = 0, Feats = 0 }, Appearance = appearance }
+end
+
+local function loadProfile(player)
+	local profile
+	if store then
+		local ok, data = pcall(function()
+			return store:GetAsync("u" .. player.UserId)
+		end)
+		if ok and type(data) == "table" then
+			profile = data
+		elseif not ok then
+			warn("[CurseService] load failed for " .. player.Name .. ": " .. tostring(data))
+		end
+	end
+	profile = profile or defaultProfile(player)
+	profile.Grade = Grades.compute(profile)
+	return profile
+end
+
+local function saveProfile(player)
+	local profile = profiles[player]
+	if not (store and profile) then
+		return
+	end
+	local ok, err = pcall(function()
+		store:SetAsync("u" .. player.UserId, {
+			Version = 1,
+			Stats = profile.Stats,
+			Appearance = profile.Appearance,
+		})
+	end)
+	if not ok then
+		warn("[CurseService] save failed for " .. player.Name .. ": " .. tostring(err))
+	end
+end
+
+---------------------------------------------------------------- ragdoll
+local function ragdollOnDeath(character)
+	local humanoid = character:WaitForChild("Humanoid")
+	humanoid.BreakJointsOnDeath = false -- keeps the Curse's welded anatomy together
+	humanoid.Died:Connect(function()
+		for _, m in ipairs(character:GetDescendants()) do
+			if m:IsA("Motor6D") and m.Name ~= "RootJoint" and m.Part0 and m.Part1 then
+				local a0 = Instance.new("Attachment")
+				a0.CFrame = m.C0
+				a0.Parent = m.Part0
+				local a1 = Instance.new("Attachment")
+				a1.CFrame = m.C1
+				a1.Parent = m.Part1
+				local socket = Instance.new("BallSocketConstraint")
+				socket.Attachment0, socket.Attachment1 = a0, a1
+				socket.LimitsEnabled, socket.TwistLimitsEnabled = true, true
+				socket.UpperAngle = 60
+				socket.Parent = m.Part0
+				m.Enabled = false
+				if m.Part1.Parent == character then
+					m.Part1.CanCollide = true
+				end
+			end
+		end
+	end)
+end
+
+---------------------------------------------------------------- building
+local function buildCurse(player, character)
+	local profile = profiles[player]
+	if not profile then
+		return
+	end
+	local ok, err = CurseBody.Rig.isR6(character)
+	if not ok then
+		warn("[CurseService] " .. player.Name .. ": " .. err .. " (set Avatar Type to R6)")
+		return
+	end
+	local _, issues = CurseBody.apply(character, profile.Appearance, { grade = profile.Grade, form = "Base" })
+	if #issues > 0 then
+		warn("[CurseService] " .. player.Name .. " appearance adjusted: " .. table.concat(issues, "; "))
+	end
+	formState[player] = { stage = "Base", token = 0, readyAt = 0 }
+	ragdollOnDeath(character)
+end
+
+local function onPlayerAdded(player)
+	profiles[player] = loadProfile(player)
+	player:SetAttribute("CurseGrade", profiles[player].Grade)
+	player.CharacterAppearanceLoaded:Connect(function(character)
+		buildCurse(player, character)
+	end)
+	if player.Character and player:HasAppearanceLoaded() then
+		buildCurse(player, player.Character)
+	end
+end
+
+-- Call from your progression code whenever stats change (cursed energy, feats …).
+local function setStats(player, stats)
+	local profile = profiles[player]
+	if not profile then
+		return
+	end
+	for k, v in pairs(stats) do
+		profile.Stats[k] = v
+	end
+	local grade = Grades.compute(profile)
+	if grade ~= profile.Grade then
+		profile.Grade = grade
+		player:SetAttribute("CurseGrade", grade)
+		if player.Character and CurseBody.getState(player.Character) then
+			CurseBody.setGrade(player.Character, grade)
+		end
+	end
+end
+
+---------------------------------------------------------------- remotes
+local remotes = ReplicatedStorage:FindFirstChild("CurseRemotes") or Instance.new("Folder")
+remotes.Name = "CurseRemotes"
+remotes.Parent = ReplicatedStorage
+local function remote(name)
+	local r = remotes:FindFirstChild(name) or Instance.new("RemoteFunction")
+	r.Name = name
+	r.Parent = remotes
+	return r
+end
+
+remote("RequestForm").OnServerInvoke = function(player, stage)
+	local character, fs = player.Character, formState[player]
+	if type(stage) ~= "string" or not character or not fs then
+		return false, "no curse"
+	end
+	if stage ~= "Base" and os.clock() < fs.readyAt then
+		return false, "cooldown"
+	end
+	local ok, err = CurseBody.setForm(character, stage)
+	if not ok then
+		return false, err
+	end
+	fs.stage = stage
+	fs.token += 1
+	local token = fs.token
+	if stage ~= "Base" then
+		fs.readyAt = os.clock() + CONFIG.FORM_COOLDOWN + (CONFIG.FORM_DURATION[stage] or 0)
+		task.delay(CONFIG.FORM_DURATION[stage] or 30, function()
+			if formState[player] == fs and fs.token == token and player.Character == character then
+				CurseBody.setForm(character, "Base")
+				fs.stage = "Base"
+			end
+		end)
+	end
+	return true
+end
+
+remote("SaveAppearance").OnServerInvoke = function(player, appearance)
+	local profile = profiles[player]
+	if not profile or type(appearance) ~= "table" then
+		return false, "bad request"
+	end
+	local clean, issues = CurseBody.Appearance.sanitize(appearance, profile.Grade)
+	profile.Appearance = clean
+	if player.Character and CurseBody.getState(player.Character) then
+		CurseBody.apply(player.Character, clean, { grade = profile.Grade, form = "Base" })
+	end
+	task.spawn(saveProfile, player)
+	return true, issues
+end
+
+remote("GetCatalog").OnServerInvoke = function(player)
+	local profile = profiles[player]
+	local grade = profile and profile.Grade or "Grade4"
+	local out = { grade = grade, slots = {}, transformations = {}, bodyTypes = {} }
+	for _, slot in ipairs(Slots.list) do
+		local list = {}
+		for _, def in ipairs(Registry.list(slot.name)) do
+			table.insert(list, { id = def.id, grade = def.grade, tags = def.tags, locked = not Grades.atLeast(grade, def.grade) })
+		end
+		out.slots[slot.name] = { kind = slot.kind, cap = Grades.cap(grade, slot.cap or ""), components = list }
+	end
+	for _, t in ipairs(Registry.listTransformations()) do
+		table.insert(out.transformations, { id = t.id, grade = t.grade, description = t.description,
+			locked = not Grades.atLeast(grade, t.grade) })
+	end
+	for name in pairs(CurseBody.BodyTypes.defs) do
+		table.insert(out.bodyTypes, { id = name, locked = not Grades.bodyTypeAllowed(grade, name) })
+	end
+	return out
+end
+
+---------------------------------------------------------------- lifecycle
+Players.PlayerAdded:Connect(onPlayerAdded)
+for _, player in ipairs(Players:GetPlayers()) do
+	task.spawn(onPlayerAdded, player)
+end
+Players.PlayerRemoving:Connect(function(player)
+	saveProfile(player)
+	profiles[player] = nil
+	formState[player] = nil
+end)
+game:BindToClose(function()
+	for _, player in ipairs(Players:GetPlayers()) do
+		saveProfile(player)
+	end
+end)
+
+-- Studio: a lineup of every preset as NPCs, to see the range of the system.
+if CONFIG.SPAWN_PRESET_GALLERY then
+	local folder = Instance.new("Folder")
+	folder.Name = "CurseGallery"
+	folder.Parent = workspace
+	local names = {}
+	for name in pairs(CurseBody.Presets) do
+		table.insert(names, name)
+	end
+	table.sort(names)
+	for i, name in ipairs(names) do
+		local preset = CurseBody.Presets[name]
+		local rig = CurseBody.createRig(name, CFrame.new((i - (#names + 1) / 2) * 12, 5, -30))
+		rig.Parent = folder
+		CurseBody.apply(rig, preset.appearance, { grade = preset.grade })
+	end
+end
+
+-- Expose for other server scripts (progression, admin commands …).
+_G.CurseService = { setStats = setStats, profiles = profiles, save = saveProfile }
+]]></ProtectedString></Properties></Item></roblox>

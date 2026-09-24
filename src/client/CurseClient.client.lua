@@ -1,0 +1,89 @@
+--!nonstrict
+--[[
+	CurseClient — per-client motion for every Curse in the game.
+
+	• CurseSway   Motor6Ds (tails, tendrils, tentacles, stalks, wing roots): procedural
+	              sway that grows with movement speed.
+	• CurseMirror Motor6Ds (extra arms / legs / heads): copy the animated Transform of a
+	              real R6 joint (MirrorJoint), smoothed by MirrorDelay and scaled by
+	              MirrorScale (negative = opposite phase), so extra limbs walk and swing.
+	• GrowIn      folders (new anatomy from equip / transformations) scale in from nothing.
+
+	Transform is local to each client, which is why this runs on every client.
+	If your own animations key a tail/limb joint, set the attribute AnimationDriven = true
+	on that Motor6D and this script leaves it alone.
+]]
+
+local CollectionService = game:GetService("CollectionService")
+local RunService = game:GetService("RunService")
+local TweenService = game:GetService("TweenService")
+
+local IDENTITY = CFrame.identity
+local smoothed = setmetatable({}, { __mode = "k" })
+
+local function rootOf(motor)
+	local model = motor:FindFirstAncestorOfClass("Model")
+	while model and not model:FindFirstChild("HumanoidRootPart") do
+		model = model.Parent and model.Parent:FindFirstAncestorOfClass("Model")
+	end
+	return model and model:FindFirstChild("HumanoidRootPart")
+end
+
+local function scaled(cf, s)
+	if s >= 0 then
+		return IDENTITY:Lerp(cf, math.min(s, 1))
+	end
+	return IDENTITY:Lerp(cf:Inverse(), math.min(-s, 1))
+end
+
+local clock = 0
+RunService.PreSimulation:Connect(function(dt)
+	clock += dt
+	for _, motor in ipairs(CollectionService:GetTagged("CurseSway")) do
+		if motor:IsDescendantOf(workspace) and not motor:GetAttribute("AnimationDriven") then
+			local root = rootOf(motor)
+			local speed = root and root.AssemblyLinearVelocity.Magnitude or 0
+			local amp = math.rad((motor:GetAttribute("SwayAmp") or 6) * (1 + math.min(speed, 24) / 16))
+			local phase = clock * (motor:GetAttribute("SwaySpeed") or 1.5) * (1 + speed / 30) * math.pi * 2 / 2
+				- (motor:GetAttribute("SwayPhase") or 0)
+			motor.Transform = CFrame.Angles(math.sin(phase) * amp * 0.6, 0, math.sin(phase * 0.8 + 1.3) * amp)
+		end
+	end
+	for _, motor in ipairs(CollectionService:GetTagged("CurseMirror")) do
+		if motor:IsDescendantOf(workspace) and not motor:GetAttribute("AnimationDriven") and motor.Part0 then
+			local source = motor.Part0:FindFirstChild(motor:GetAttribute("MirrorJoint") or "")
+			if source and source:IsA("Motor6D") then
+				local target = scaled(source.Transform, motor:GetAttribute("MirrorScale") or 1)
+				local delay = math.max(motor:GetAttribute("MirrorDelay") or 0.1, 0.01)
+				local current = smoothed[motor] or target
+				current = current:Lerp(target, 1 - math.exp(-dt / delay))
+				smoothed[motor] = current
+				motor.Transform = current
+			end
+		end
+	end
+end)
+
+-- New anatomy erupts instead of popping in.
+local GROW = TweenInfo.new(0.45, Enum.EasingStyle.Back, Enum.EasingDirection.Out)
+local function growIn(folder)
+	task.defer(function()
+		for _, d in ipairs(folder:GetDescendants()) do
+			if d:IsA("SpecialMesh") and d.MeshType == Enum.MeshType.Sphere then
+				local target = d.Scale
+				d.Scale = target * 0.05
+				TweenService:Create(d, GROW, { Scale = target }):Play()
+			elseif d:IsA("BasePart") and not d:FindFirstChildOfClass("SpecialMesh") and d.Transparency < 1 then
+				local target = d.Transparency
+				d.Transparency = 1
+				TweenService:Create(d, GROW, { Transparency = target }):Play()
+			end
+		end
+	end)
+end
+
+workspace.DescendantAdded:Connect(function(d)
+	if d:IsA("Folder") and d:GetAttribute("GrowIn") then
+		growIn(d)
+	end
+end)

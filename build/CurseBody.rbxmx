@@ -1,0 +1,4958 @@
+<roblox xmlns:xmime="http://www.w3.org/2005/05/xmlmime" version="4"><Item class="ModuleScript" referent="RBX19"><Properties><string name="Name">CurseBody</string><ProtectedString name="Source"><![CDATA[--!nonstrict
+--[[
+	CurseBody — modular R6 Curse anatomy.
+
+	local CurseBody = require(ReplicatedStorage.CurseBody)
+	CurseBody.apply(character, appearance, { grade = "Grade2" })   -- build / rebuild
+	CurseBody.setForm(character, "Full")                            -- transformation stage
+	CurseBody.equip(character, "Horns", { "RamHorns" })             -- change one slot
+	CurseBody.setGrade(character, "Grade1")
+
+	See docs/ARCHITECTURE.md. Server-side only: geometry built on the server replicates.
+]]
+
+local HttpService = game:GetService("HttpService")
+local CollectionService = game:GetService("CollectionService")
+local RunService = game:GetService("RunService")
+
+local Util = require(script.Util)
+local Slots = require(script.Slots)
+local Grades = require(script.Grades)
+local Registry = require(script.Registry)
+local Palettes = require(script.Palettes)
+local BodyTypes = require(script.BodyTypes)
+local Appearance = require(script.Appearance)
+local Rig = require(script.Rig)
+local Builder = require(script.Builder)
+
+local CurseBody = {
+	Util = Util,
+	Slots = Slots,
+	Grades = Grades,
+	Registry = Registry,
+	Palettes = Palettes,
+	BodyTypes = BodyTypes,
+	Appearance = Appearance,
+	Rig = Rig,
+	Builder = Builder,
+}
+
+local states = setmetatable({}, { __mode = "k" })
+
+Registry.loadCatalog(script.Catalog)
+CurseBody.Presets = require(script.Presets)
+
+---------------------------------------------------------------------------- building
+
+local function mergeParams(def, entry, overrides)
+	local params = table.clone(def.params)
+	for k, v in pairs(entry.params or {}) do
+		params[k] = v
+	end
+	for k, v in pairs(overrides or {}) do
+		params[k] = v
+	end
+	return params
+end
+
+local function buildComponent(ctx, id, entry, overrides)
+	local def = Registry.get(id or "")
+	if not def or not def.build then
+		return nil
+	end
+	local params = mergeParams(def, entry or {}, overrides)
+	local ok, result = pcall(def.build, ctx, params, entry or {})
+	if not ok then
+		warn(("[CurseBody] %s failed to build: %s"):format(id, tostring(result)))
+		return nil
+	end
+	return result
+end
+
+local SWAP = { R = "L", L = "R" }
+local function mirroredSocketName(name)
+	local base, suffix = string.match(name, "^(.-_?)([RL])$")
+	if base and SWAP[suffix] then
+		return base .. SWAP[suffix]
+	end
+	return nil
+end
+
+-- Build one entry of a multi slot at its socket (+ offset, rotation, scale, mirror).
+local function buildEntry(ctx, entry)
+	local def = Registry.get(entry.id or "")
+	if not def then
+		return
+	end
+	local function at(socketName)
+		local anchor = ctx:socket(socketName)
+		local cf = anchor.cf * ctx:with({ side = 1, scale = Vector3.one }, function()
+			return ctx:localCF(entry.pos, entry.rot)
+		end)
+		local scale = Util.v3(entry.scale, Vector3.one)
+		ctx:with({
+			at = { part = anchor.part, cf = cf, side = anchor.side },
+			side = anchor.side,
+			sideName = anchor.side > 0 and "Right" or "Left",
+			scale = scale,
+			entry = entry,
+		}, buildComponent, ctx, entry.id, entry)
+	end
+	local socketName = entry.socket or def.params.socket or "Chest"
+	at(socketName)
+	if entry.mirror then
+		local other = mirroredSocketName(socketName)
+		if other then
+			at(other)
+		end
+	end
+end
+CurseBody.buildEntry = buildEntry
+
+local function mainId(value, sideName)
+	if type(value) == "table" then
+		return value[sideName]
+	end
+	return value
+end
+
+local function torsoLocal(ctx, anchor)
+	local torso = ctx.character.Torso
+	return torso.CFrame:ToObjectSpace(anchor.part.CFrame * anchor.cf)
+end
+
+-- Limb slots -----------------------------------------------------------------
+
+local AUTO_ARM_SOCKETS = { "FlankR", "FlankL", "BackR", "BackL", "ChestLowR", "ChestLowL", "ShoulderR", "ShoulderL" }
+local AUTO_HEAD_SOCKETS = { "ShoulderR", "ShoulderL", "UpperBack", "BackR", "BackL", "ChestR", "ChestL" }
+
+local LIMB_BUILDERS = {}
+
+function LIMB_BUILDERS.ExtraArms(ctx, list, eff)
+	for i, e in ipairs(list) do
+		local socketName = e.socket or AUTO_ARM_SOCKETS[(i - 1) % #AUTO_ARM_SOCKETS + 1]
+		local anchor = ctx:socket(socketName)
+		local side = anchor.side
+		local sideName = side > 0 and "Right" or "Left"
+		local pos = torsoLocal(ctx, anchor).Position
+		local tier = math.floor((i - 1) / 2)
+		local limb = ctx:limb("Arm", "ExtraArm" .. i, side, pos, sideName .. " Shoulder", {
+			splay = e.splay or (14 + 10 * tier),
+			tilt = e.tilt or 0,
+			delay = 0.08 + 0.06 * i,
+			mirrorScale = e.mirrorScale or ((tier % 2 == 1) and -0.8 or 0.85),
+		})
+		ctx:with({ side = side, sideName = sideName, suffix = "E" .. i }, function()
+			buildComponent(ctx, e.id or mainId(eff.Arms, sideName), { part = limb })
+			buildComponent(ctx, e.hand or mainId(eff.Hands, sideName), { part = limb })
+		end)
+	end
+end
+
+function LIMB_BUILDERS.ExtraLegs(ctx, list, eff)
+	for i, e in ipairs(list) do
+		local side = (i % 2 == 1) and 1 or -1
+		local sideName = side > 0 and "Right" or "Left"
+		local tier = math.floor((i - 1) / 2) + 1
+		local pos
+		if e.socket then
+			pos = torsoLocal(ctx, ctx:socket(e.socket)).Position
+		else
+			local hip = ctx.layout["hip" .. sideName]
+			pos = hip + Vector3.new(side * 0.35 * tier, 0.25, 0.55 * tier)
+		end
+		local limb = ctx:limb("Leg", "ExtraLeg" .. i, side, pos, (tier % 2 == 1) and ((side > 0) and "Left Hip" or "Right Hip")
+			or (sideName .. " Hip"), {
+			splay = e.splay or (18 + 10 * tier),
+			delay = 0.05 * tier,
+			mirrorScale = e.mirrorScale or 0.9,
+		})
+		ctx:with({ side = side, sideName = sideName, suffix = "X" .. i }, function()
+			buildComponent(ctx, e.id or mainId(eff.Legs, sideName), { part = limb, extra = true })
+			buildComponent(ctx, e.foot or mainId(eff.Feet, sideName), { part = limb, extra = true })
+		end)
+	end
+end
+
+function LIMB_BUILDERS.ExtraHeads(ctx, list, eff)
+	for i, e in ipairs(list) do
+		local socketName = e.socket or AUTO_HEAD_SOCKETS[(i - 1) % #AUTO_HEAD_SOCKETS + 1]
+		local anchor = ctx:socket(socketName)
+		local side = anchor.side
+		local pos = torsoLocal(ctx, anchor).Position + Vector3.new(0, -0.1, 0)
+		local limb = ctx:limb("Head", "ExtraHead" .. i, 1, pos, "Neck", {
+			yaw = e.yaw or (side * 25),
+			tilt = e.tilt or 0,
+			delay = 0.15 + 0.05 * i,
+			mirrorScale = 0.6,
+		})
+		local headId = e.id or eff.Head
+		local prefix = "H" .. i .. "_"
+		ctx:with({ side = 1, sideName = nil, socketPrefix = prefix, scale = Util.v3(e.scale, Vector3.one) * 0.85 },
+			function()
+				buildComponent(ctx, headId, { part = limb })
+				local def = Registry.get(headId)
+				local features = {}
+				for _, slotName in ipairs({ "Eyes", "Mouths", "HeadGrowths", "Horns" }) do
+					local list2 = e[slotName] or (def and def.defaults and def.defaults[slotName])
+					for _, fe in ipairs(Appearance.toList(list2)) do
+						table.insert(features, fe)
+					end
+				end
+				for _, fe in ipairs(features) do
+					buildEntry(ctx, fe)
+				end
+			end)
+	end
+end
+
+---------------------------------------------------------------------------- slot rebuild
+
+local function regionFolder(state, region)
+	local f = state.curse:FindFirstChild(region)
+	if not f then
+		f = Instance.new("Folder")
+		f.Name = region
+		f.Parent = state.curse
+	end
+	return f
+end
+
+local function clearSockets(state, owner)
+	for name, s in pairs(state.sockets) do
+		if s.owner == owner then
+			local att = s.part and s.part:FindFirstChild("CurseSocket_" .. name)
+			if att and att:GetAttribute("Owner") == owner then
+				att:Destroy()
+			end
+			state.sockets[name] = nil
+		end
+	end
+end
+
+local function rebuildSlot(state, slot, growIn)
+	local region = regionFolder(state, slot.region)
+	local old = region:FindFirstChild(slot.folder)
+	if old then
+		old:Destroy()
+	end
+	clearSockets(state, slot.name)
+	local value = state.effective[slot.name]
+	if value == nil or (type(value) == "table" and #value == 0 and slot.kind ~= "sided") then
+		return
+	end
+	local folder = Instance.new("Folder")
+	folder.Name = slot.folder
+	if growIn then
+		folder:SetAttribute("GrowIn", true)
+	end
+	local ctx = Builder.new(state)
+	ctx.folder = folder
+	ctx.owner = slot.name
+	if slot.kind == "single" then
+		buildComponent(ctx, value, {})
+	elseif slot.kind == "sided" then
+		for _, sideName in ipairs({ "Right", "Left" }) do
+			local s = sideName == "Right" and 1 or -1
+			ctx:with({ side = s, sideName = sideName, suffix = string.sub(sideName, 1, 1) }, buildComponent, ctx,
+				mainId(value, sideName), {})
+		end
+	elseif slot.kind == "multi" then
+		for _, entry in ipairs(value) do
+			buildEntry(ctx, entry)
+		end
+	elseif slot.kind == "limbs" then
+		LIMB_BUILDERS[slot.name](ctx, value, state.effective)
+	end
+	folder.Parent = region
+end
+
+local function forEachComponent(eff, fn)
+	for _, slot in ipairs(Slots.list) do
+		local v = eff[slot.name]
+		if slot.kind == "single" and v then
+			local def = Registry.get(v)
+			if def then
+				fn(def, def.params, {}, nil)
+			end
+		elseif slot.kind == "sided" and v then
+			for _, sideName in ipairs({ "Right", "Left" }) do
+				local def = Registry.get(mainId(v, sideName) or "")
+				if def then
+					fn(def, def.params, {}, sideName)
+				end
+			end
+		elseif slot.kind == "multi" and type(v) == "table" then
+			for _, entry in ipairs(v) do
+				local def = Registry.get(entry.id or "")
+				if def then
+					fn(def, mergeParams(def, entry), entry, nil)
+				end
+			end
+		end
+	end
+end
+
+local function resolveBody(eff)
+	local body = BodyTypes.resolve(eff)
+	for k, v in pairs(eff.Layout or {}) do
+		body.layout[k] = (body.layout[k] or 0) + v
+	end
+	forEachComponent(eff, function(def, params, entry, sideName)
+		if def.mutate then
+			local ok, err = pcall(def.mutate, body, params, entry, sideName)
+			if not ok then
+				warn("[CurseBody] " .. def.id .. " mutate failed: " .. tostring(err))
+			end
+		end
+	end)
+	return body
+end
+
+local function refresh(state, opts)
+	opts = opts or {}
+	local character = state.character
+	local eff, issues = Appearance.resolve(state.base, state.form, state.grade)
+	local body = resolveBody(eff)
+	local layout = Rig.computeLayout(body)
+	local bodyKey = Util.serialize({ body.mass, body.side, body.layout, eff.Palette, eff.Seed })
+	local full = opts.full or bodyKey ~= state.bodyKey
+
+	local scale = character:GetScale()
+	if math.abs(scale - 1) > 1e-3 then
+		character:ScaleTo(1)
+	end
+
+	state.effective, state.body, state.layout, state.bodyKey = eff, body, layout, bodyKey
+	state.palette = Palettes.resolve(eff.Palette)
+	Rig.applyLayout(character, layout)
+	if not RunService:IsRunning() then
+		Rig.snap(character)
+	end
+
+	state.defaultSockets = {}
+	for name, s in pairs(Rig.defaultSockets(body, layout)) do
+		state.defaultSockets[name] = {
+			part = character[s[1]],
+			cf = CFrame.new(s[2]) * s[3],
+			side = s[4] or 1,
+			owner = "Rig",
+		}
+	end
+
+	if full then
+		for _, region in ipairs(state.curse:GetChildren()) do
+			region:Destroy()
+		end
+		for name, s in pairs(state.sockets) do
+			local att = s.part and s.part:FindFirstChild("CurseSocket_" .. name)
+			if att then
+				att:Destroy()
+			end
+		end
+		state.sockets = {}
+		state.built = {}
+	end
+
+	local dirty = {}
+	for _, slot in ipairs(Slots.list) do
+		local key = Util.serialize(eff[slot.name])
+		if full or dirty[slot.name] or state.built[slot.name] ~= key then
+			rebuildSlot(state, slot, opts.growIn)
+			state.built[slot.name] = key
+			for dep in pairs(Slots.dependentsOf(slot.name)) do
+				dirty[dep] = true
+			end
+		end
+	end
+
+	if math.abs(eff.Height - 1) > 1e-3 then
+		character:ScaleTo(eff.Height)
+	end
+	character:SetAttribute("CurseAppearance", HttpService:JSONEncode(eff))
+	character:SetAttribute("CurseGrade", state.grade)
+	character:SetAttribute("CurseForm", state.form)
+	CollectionService:AddTag(character, "CurseBody")
+	state.issues = issues
+	return state, issues
+end
+
+---------------------------------------------------------------------------- public API
+
+function CurseBody.apply(character, appearance, opts)
+	opts = opts or {}
+	local ok, err = Rig.isR6(character)
+	if not ok then
+		error("[CurseBody] " .. err, 2)
+	end
+	local state = states[character]
+	if not state then
+		state = {
+			character = character,
+			sockets = {},
+			defaultSockets = {},
+			built = {},
+			form = "Base",
+			buildComponent = buildComponent,
+			buildEntry = buildEntry,
+		}
+		states[character] = state
+	end
+	state.grade = opts.grade or state.grade or "Grade4"
+	state.form = opts.form or state.form or "Base"
+	state.base = Appearance.sanitize(appearance, state.grade)
+	state.curse = Rig.prepare(character, opts.hideBase)
+	return refresh(state, { full = true })
+end
+
+function CurseBody.getState(character)
+	return states[character]
+end
+
+function CurseBody.setForm(character, stage)
+	local state = states[character]
+	if not state then
+		return false, "no curse body"
+	end
+	if not Grades.formStages[stage] then
+		return false, "unknown stage " .. tostring(stage)
+	end
+	if not Grades.formAllowed(state.grade, stage) then
+		return false, stage .. " is locked at " .. state.grade
+	end
+	if stage ~= "Base" and not state.base.Transformation and not state.base.Forms then
+		return false, "no transformation equipped"
+	end
+	state.form = stage
+	refresh(state, { growIn = true })
+	return true
+end
+
+-- Replace a slot (or BodyType / Palette / Height / Scales / Transformation) in the base appearance.
+function CurseBody.equip(character, key, value)
+	local state = states[character]
+	assert(state, "no curse body")
+	local a = Util.deepCopy(state.base)
+	a[key] = value
+	state.base = Appearance.sanitize(a, state.grade)
+	return refresh(state, { growIn = true })
+end
+
+function CurseBody.unequip(character, slotName, id)
+	local state = states[character]
+	assert(state, "no curse body")
+	local slot = Slots.get(slotName)
+	local a = Util.deepCopy(state.base)
+	if slot and (slot.kind == "multi" or slot.kind == "limbs") then
+		a = Appearance.applyOverride(a, { [slotName] = { remove = id or "all" } })
+	else
+		a[slotName] = nil
+	end
+	state.base = Appearance.sanitize(a, state.grade)
+	return refresh(state, { growIn = true })
+end
+
+function CurseBody.setGrade(character, grade)
+	local state = states[character]
+	assert(state and Grades.valid(grade), "bad grade")
+	state.grade = grade
+	if not Grades.formAllowed(grade, state.form) then
+		state.form = "Base"
+	end
+	state.base = Appearance.sanitize(state.base, grade)
+	return refresh(state, { full = true })
+end
+
+function CurseBody.getAppearance(character)
+	local state = states[character]
+	return state and Util.deepCopy(state.base)
+end
+
+-- Make the current form permanent (merge its overrides into the base appearance).
+function CurseBody.commitForm(character)
+	local state = states[character]
+	assert(state, "no curse body")
+	local committed = Util.deepCopy(state.effective)
+	committed.Transformation = state.base.Transformation
+	committed.Forms = state.base.Forms
+	state.base = committed
+	state.form = "Base"
+	return refresh(state, {})
+end
+
+function CurseBody.remove(character)
+	local state = states[character]
+	if state and state.curse then
+		state.curse:Destroy()
+	end
+	states[character] = nil
+	for _, name in ipairs(Rig.PARTS) do
+		local p = character:FindFirstChild(name)
+		if p then
+			p.Transparency = 0
+		end
+	end
+	CollectionService:RemoveTag(character, "CurseBody")
+end
+
+function CurseBody.createRig(name, cframe)
+	return Rig.create(name, cframe)
+end
+
+return CurseBody
+]]></ProtectedString></Properties><Item class="ModuleScript" referent="RBX0"><Properties><string name="Name">Appearance</string><ProtectedString name="Source"><![CDATA[--!nonstrict
+--[[
+	Appearance = the saved, JSON-safe description of a Curse's anatomy.
+
+	  normalize(a)          fill defaults, migrate old/alias keys, canonical entry tables
+	  sanitize(a, grade)    strip/clamp anything the grade does not allow → clean, issues
+	  resolve(a, stage, grade)  apply transformation stage overrides, then sanitize
+	  applyOverride(a, over)    override semantics used by transformations and equip()
+
+	Slot values
+	  single  "OctopoidHead"
+	  sided   "ThinArm" | { Right = "MuscularArm", Left = "ThinArm" }
+	  multi   { "RamHorns", { id = "CurvedHorn", socket = "Brow", pos = {…}, rot = {…}, scale = 1.3, params = {…} } }
+	  limbs   2 | { { id = "ThinArm", hand = "BladedFingers", socket = "BackR" }, … }
+	  nil for a multi slot = the head/torso component's defaults; {} = none.
+]]
+
+local Util = require(script.Parent.Util)
+local Slots = require(script.Parent.Slots)
+local Grades = require(script.Parent.Grades)
+local Registry = require(script.Parent.Registry)
+local Palettes = require(script.Parent.Palettes)
+local BodyTypes = require(script.Parent.BodyTypes)
+
+local Appearance = {}
+
+Appearance.VERSION = 1
+
+Appearance.DEFAULT = {
+	Version = 1,
+	Seed = 1,
+	BodyType = "Normal",
+	Palette = "Crimson",
+	Height = 1,
+	Scales = {},
+	Layout = {},
+}
+
+-- which catalog slot validates the ids inside each limb slot
+Appearance.LIMB_SLOTS = {
+	ExtraArms = { id = "Arms", hand = "Hands" },
+	ExtraLegs = { id = "Legs", foot = "Feet" },
+	ExtraHeads = { id = "Head" },
+}
+
+-- aliases accepted from older saves / hand-written data
+local ALIASES = {
+	Tail = "Tails", TorsoGrowth = "TorsoGrowths", Mouth = "Mouths", Eye = "Eyes", Horn = "Horns",
+	ExtraLimbs = "ExtraArms", Disfigurement = "Disfigurements", HeadGrowth = "HeadGrowths",
+	BackParts = "Back", ExtraHead = "ExtraHeads", Arm = "Arms", Leg = "Legs", Hand = "Hands", Foot = "Feet",
+}
+
+local function toEntry(v)
+	if type(v) == "string" then
+		return { id = v }
+	elseif type(v) == "table" then
+		return Util.deepCopy(v)
+	end
+	return nil
+end
+
+function Appearance.toList(value)
+	if value == nil then
+		return {}
+	end
+	if type(value) == "number" then
+		local out = {}
+		for _ = 1, math.max(0, math.floor(value)) do
+			table.insert(out, {})
+		end
+		return out
+	end
+	if type(value) == "string" or (type(value) == "table" and value.id) then
+		return { toEntry(value) }
+	end
+	local out = {}
+	for _, v in ipairs(value) do
+		table.insert(out, toEntry(v))
+	end
+	return out
+end
+
+function Appearance.migrate(a)
+	a = Util.deepCopy(a or {})
+	for old, new in pairs(ALIASES) do
+		if a[old] ~= nil and a[new] == nil then
+			a[new] = a[old]
+		end
+		a[old] = nil
+	end
+	a.Version = Appearance.VERSION
+	return a
+end
+
+function Appearance.normalize(a)
+	a = Appearance.migrate(a)
+	for k, v in pairs(Appearance.DEFAULT) do
+		if a[k] == nil then
+			a[k] = Util.deepCopy(v)
+		end
+	end
+	for _, slot in ipairs(Slots.list) do
+		local v = a[slot.name]
+		if v ~= nil and (slot.kind == "multi" or slot.kind == "limbs") then
+			a[slot.name] = Appearance.toList(v)
+		end
+	end
+	return a
+end
+
+-- nil multi slots → defaults declared by the head / torso components
+function Appearance.materializeDefaults(a)
+	local head = Registry.get(a.Head or "")
+	local torso = Registry.get(a.Torso or "")
+	for _, slot in ipairs(Slots.list) do
+		if (slot.kind == "multi" or slot.kind == "limbs") and a[slot.name] == nil then
+			local d = (head and head.defaults and head.defaults[slot.name])
+				or (torso and torso.defaults and torso.defaults[slot.name])
+			a[slot.name] = Appearance.toList(Util.deepCopy(d))
+		end
+	end
+	return a
+end
+
+---------------------------------------------------------------------------- sanitize
+
+local function allowed(def, slotName, grade)
+	return def ~= nil and Registry.accepts(def, slotName) and Grades.atLeast(grade, def.grade)
+end
+
+local function sanitizeId(id, slotName, grade, issues, fallback)
+	local def = type(id) == "string" and Registry.get(id) or nil
+	if allowed(def, slotName, grade) then
+		return id
+	end
+	if id ~= nil then
+		table.insert(issues, ("%s: %s not allowed at %s"):format(slotName, tostring(id), grade))
+	end
+	return fallback
+end
+
+local function clampScale(scale, grade)
+	local range = Grades.cap(grade, "ScaleRange")
+	local hi = 1 + 2 * range
+	if type(scale) == "number" then
+		return math.clamp(scale, 0.3, hi)
+	elseif type(scale) == "table" then
+		return { math.clamp(scale[1] or 1, 0.3, hi), math.clamp(scale[2] or 1, 0.3, hi), math.clamp(scale[3] or 1, 0.3, hi) }
+	end
+	return nil
+end
+
+function Appearance.sanitize(input, grade)
+	grade = Grades.valid(grade) and grade or "Grade4"
+	local issues = {}
+	local a = Appearance.normalize(input)
+	local out = {
+		Version = Appearance.VERSION,
+		Seed = math.floor(tonumber(a.Seed) or 1),
+		Transformation = nil,
+		Forms = nil,
+	}
+
+	-- body type
+	if BodyTypes.exists(a.BodyType) and Grades.bodyTypeAllowed(grade, a.BodyType) then
+		out.BodyType = a.BodyType
+	else
+		table.insert(issues, "BodyType " .. tostring(a.BodyType) .. " not allowed at " .. grade)
+		out.BodyType = "Normal"
+	end
+	out.Palette = Palettes.valid(a.Palette) and Util.deepCopy(a.Palette) or "Crimson"
+	out.Height = math.clamp(tonumber(a.Height) or 1, Grades.cap(grade, "HeightMin"), Grades.cap(grade, "HeightMax"))
+
+	local range = Grades.cap(grade, "ScaleRange")
+	out.Scales = {}
+	for k, v in pairs(type(a.Scales) == "table" and a.Scales or {}) do
+		if type(v) == "number" then
+			out.Scales[k] = math.clamp(v, 1 - range * 0.7, 1 + range)
+		end
+	end
+	out.Layout = {}
+	for k, v in pairs(type(a.Layout) == "table" and a.Layout or {}) do
+		if type(v) == "number" then
+			out.Layout[k] = math.clamp(v, -40, 40)
+		end
+	end
+
+	for _, slot in ipairs(Slots.list) do
+		local v = a[slot.name]
+		if slot.kind == "single" then
+			out[slot.name] = sanitizeId(v or slot.default, slot.name, grade, issues, slot.default)
+		elseif slot.kind == "sided" then
+			local r, l = v, v
+			if type(v) == "table" then
+				r, l = v.Right, v.Left
+			end
+			local right = sanitizeId(r or slot.default, slot.name, grade, issues, slot.default)
+			local left = sanitizeId(l or slot.default, slot.name, grade, issues, slot.default)
+			out[slot.name] = right == left and right or { Right = right, Left = left }
+		elseif v ~= nil then
+			local cap, used, list = Grades.cap(grade, slot.cap), 0, {}
+			for _, entry in ipairs(Appearance.toList(v)) do
+				local ok = true
+				if slot.kind == "limbs" then
+					for field, catalogSlot in pairs(Appearance.LIMB_SLOTS[slot.name]) do
+						if entry[field] ~= nil then
+							entry[field] = sanitizeId(entry[field], catalogSlot, grade, issues, nil)
+						end
+					end
+				else
+					local def = Registry.get(entry.id or "")
+					ok = allowed(def, slot.name, grade)
+					if not ok then
+						table.insert(issues, ("%s: %s not allowed at %s"):format(slot.name, tostring(entry.id), grade))
+					end
+				end
+				if ok then
+					local def = entry.id and Registry.get(entry.id)
+					local units = (slot.kind == "limbs" or not def) and 1 or Registry.units(def, entry.params or def.params)
+					if used + units <= cap then
+						used += units
+						entry.scale = clampScale(entry.scale, grade)
+						table.insert(list, entry)
+					else
+						table.insert(issues, ("%s: over the %s cap of %d"):format(slot.name, grade, cap))
+					end
+				end
+			end
+			out[slot.name] = list
+		end
+	end
+
+	local t = a.Transformation and Registry.getTransformation(a.Transformation)
+	if t and Grades.atLeast(grade, t.grade) then
+		out.Transformation = a.Transformation
+	elseif a.Transformation then
+		table.insert(issues, "Transformation " .. tostring(a.Transformation) .. " not allowed at " .. grade)
+	end
+	if type(a.Forms) == "table" then
+		out.Forms = Util.deepCopy(a.Forms)
+	end
+	return out, issues
+end
+
+---------------------------------------------------------------------------- overrides
+
+local function entryMatches(entry, key)
+	return entry.id == key or entry.name == key
+end
+
+function Appearance.applyOverride(a, over)
+	a = Util.deepCopy(a)
+	for k, v in pairs(over or {}) do
+		local slot = Slots.get(k)
+		if k == "Scales" then
+			a.Scales = a.Scales or {}
+			for sk, sv in pairs(v) do
+				a.Scales[sk] = (a.Scales[sk] or 1) * sv
+			end
+		elseif k == "Layout" then
+			a.Layout = a.Layout or {}
+			for lk, lv in pairs(v) do
+				a.Layout[lk] = (a.Layout[lk] or 0) + lv
+			end
+		elseif k == "Height" and type(v) == "table" then
+			a.Height = (a.Height or 1) * (v.mul or 1)
+		elseif slot and (slot.kind == "multi" or slot.kind == "limbs") and type(v) == "table" and (v.add ~= nil or v.remove ~= nil) then
+			local list = Appearance.toList(a[k])
+			if v.remove == "all" then
+				list = {}
+			elseif v.remove then
+				local keep = {}
+				for _, entry in ipairs(list) do
+					local drop = false
+					for _, key in ipairs(Appearance.toList(v.remove)) do
+						drop = drop or entryMatches(entry, key.id)
+					end
+					if not drop then
+						table.insert(keep, entry)
+					end
+				end
+				list = keep
+			end
+			for _, entry in ipairs(Appearance.toList(v.add)) do
+				table.insert(list, entry)
+			end
+			a[k] = list
+		else
+			a[k] = Util.deepCopy(v)
+		end
+	end
+	return a
+end
+
+-- Effective appearance for a transformation stage ("Base" | "Partial" | "Full").
+function Appearance.resolve(base, stage, grade)
+	local a = Appearance.materializeDefaults(Appearance.normalize(base))
+	stage = stage or "Base"
+	if stage ~= "Base" and Grades.formAllowed(grade, stage) then
+		local def = a.Transformation and Registry.getTransformation(a.Transformation)
+		local forms = a.Forms or (def and def.stages) or {}
+		if stage == "Full" and forms.Partial and not (forms.Full and forms.Full.inherit == false) then
+			a = Appearance.applyOverride(a, forms.Partial)
+		end
+		local over = forms[stage]
+		if over then
+			over = Util.deepCopy(over)
+			over.inherit = nil
+			a = Appearance.applyOverride(a, over)
+		end
+		-- a head swapped by the transformation brings its defaults for slots left untouched
+		a = Appearance.materializeDefaults(a)
+	end
+	return Appearance.sanitize(a, grade)
+end
+
+return Appearance
+]]></ProtectedString></Properties></Item><Item class="ModuleScript" referent="RBX1"><Properties><string name="Name">BodyTypes</string><ProtectedString name="Source"><![CDATA[--!nonstrict
+--[[
+	Body archetypes. A body type does NOT scale the character: it changes how big
+	each region is built (mass) and where the R6 joints sit (layout). Region
+	components read these through ctx:m("ArmThick") etc.
+
+	mass keys (1 = normal)
+	  TorsoW TorsoH TorsoD  torso shell width / height / depth
+	  Shoulder              shoulder + trapezius mass
+	  Neck                  neck / upper-back mass wrapped around the head
+	  Head                  head size
+	  ArmThick ArmLength    arm girth / visible arm length (hands hang lower)
+	  Hand Foot             hand / foot size
+	  LegThick              leg girth
+	layout keys
+	  hunch          forward lean of the torso in degrees (moves neck + shoulders with it)
+	  neckForward    extra forward offset of the head
+	  neckDrop       how deep the head sinks between the shoulders
+	  shoulderDrop / shoulderForward / hipSpread
+	  legExtra       studs added to visible leg length (Humanoid.HipHeight offset)
+]]
+
+local Util = require(script.Parent.Util)
+
+local BodyTypes = {}
+
+local NORMAL_MASS = {
+	TorsoW = 1, TorsoH = 1, TorsoD = 1, Shoulder = 1, Neck = 1, Head = 1,
+	ArmThick = 1, ArmLength = 1, Hand = 1, LegThick = 1, Foot = 1,
+}
+local NORMAL_LAYOUT = {
+	hunch = 0, neckForward = 0, neckDrop = 0, shoulderDrop = 0, shoulderForward = 0, hipSpread = 0, legExtra = 0,
+}
+
+BodyTypes.defs = {
+	Lean = {
+		mass = { TorsoW = 0.85, TorsoH = 1.05, TorsoD = 0.8, Shoulder = 0.8, Neck = 0.8, ArmThick = 0.72,
+			ArmLength = 1.1, Hand = 0.95, LegThick = 0.72, Foot = 0.95 },
+		layout = { hunch = 4, legExtra = 0.15 },
+	},
+	Normal = {},
+	Muscular = {
+		mass = { TorsoW = 1.2, TorsoD = 1.1, Shoulder = 1.3, Neck = 1.25, Head = 0.95, ArmThick = 1.25,
+			Hand = 1.1, LegThick = 1.15, Foot = 1.05 },
+		layout = { hunch = 5, neckDrop = 0.1 },
+	},
+	Heavy = {
+		mass = { TorsoW = 1.35, TorsoD = 1.3, Shoulder = 1.35, Neck = 1.4, Head = 0.95, ArmThick = 1.35,
+			Hand = 1.25, LegThick = 1.35, Foot = 1.2 },
+		layout = { hunch = 8, neckDrop = 0.2 },
+	},
+	Hunched = { -- the reference creature's build
+		mass = { TorsoW = 1.25, TorsoH = 1.05, TorsoD = 1.25, Shoulder = 1.3, Neck = 1.3, Head = 1.05,
+			ArmThick = 1.2, ArmLength = 1.25, Hand = 1.25, LegThick = 1.1, Foot = 1.3 },
+		layout = { hunch = 26, neckForward = 0.15, neckDrop = 0.35, shoulderDrop = 0.1 },
+	},
+	Deformed = {
+		mass = { TorsoW = 1.15, TorsoD = 1.1, Shoulder = 1.15, Neck = 1.2, ArmThick = 1.1, Hand = 1.1, LegThick = 1.05 },
+		layout = { hunch = 14, neckDrop = 0.2 },
+		side = {
+			Right = { ArmThick = 1.35, ArmLength = 1.15, Hand = 1.45, Shoulder = 1.45 },
+			Left = { ArmThick = 0.8, ArmLength = 0.9, Hand = 0.85, LegThick = 0.9 },
+		},
+	},
+	Monstrous = {
+		mass = { TorsoW = 1.5, TorsoH = 1.1, TorsoD = 1.45, Shoulder = 1.6, Neck = 1.5, Head = 0.9,
+			ArmThick = 1.55, ArmLength = 1.3, Hand = 1.5, LegThick = 1.45, Foot = 1.4 },
+		layout = { hunch = 22, neckForward = 0.1, neckDrop = 0.2, shoulderDrop = 0.05 },
+	},
+	Massive = {
+		mass = { TorsoW = 1.8, TorsoH = 1.2, TorsoD = 1.7, Shoulder = 1.9, Neck = 1.8, Head = 0.8,
+			ArmThick = 1.8, ArmLength = 1.2, Hand = 1.7, LegThick = 1.75, Foot = 1.6 },
+		layout = { hunch = 14, neckDrop = 0.45, legExtra = 0.3 },
+	},
+}
+
+-- Appearance.Scales keys → mass keys they multiply
+BodyTypes.scaleKeys = {
+	Torso = { "TorsoW", "TorsoH", "TorsoD" },
+	Shoulders = { "Shoulder" },
+	Neck = { "Neck" },
+	Head = { "Head" },
+	Arms = { "ArmThick" },
+	ArmLength = { "ArmLength" },
+	Hands = { "Hand" },
+	Legs = { "LegThick" },
+	Feet = { "Foot" },
+}
+
+function BodyTypes.exists(name)
+	return BodyTypes.defs[name] ~= nil
+end
+
+--[[
+	Resolve a body: body type → Appearance.Scales (already grade-clamped).
+	Component mutate hooks and transformation layouts are applied afterwards by the caller.
+]]
+function BodyTypes.resolve(appearance)
+	local def = BodyTypes.defs[appearance.BodyType] or BodyTypes.defs.Normal
+	local body = {
+		type = appearance.BodyType,
+		mass = Util.merge(NORMAL_MASS, def.mass),
+		layout = Util.merge(NORMAL_LAYOUT, def.layout),
+		side = { Right = Util.deepCopy(def.side and def.side.Right or {}), Left = Util.deepCopy(def.side and def.side.Left or {}) },
+	}
+	for scaleKey, value in pairs(appearance.Scales or {}) do
+		local sideName, key = string.match(scaleKey, "^(%a-)_(%a+)$")
+		local targets = BodyTypes.scaleKeys[key or scaleKey]
+		if targets then
+			for _, massKey in ipairs(targets) do
+				if sideName == "Right" or sideName == "Left" then
+					body.side[sideName][massKey] = (body.side[sideName][massKey] or 1) * value
+				else
+					body.mass[massKey] = body.mass[massKey] * value
+				end
+			end
+		end
+	end
+	return body
+end
+
+-- mass value for a key, including the per-side multiplier ("Right"/"Left"/nil)
+function BodyTypes.get(body, key, sideName)
+	local v = body.mass[key] or 1
+	if sideName and body.side[sideName] and body.side[sideName][key] then
+		v *= body.side[sideName][key]
+	end
+	return v
+end
+
+return BodyTypes
+]]></ProtectedString></Properties></Item><Item class="ModuleScript" referent="RBX2"><Properties><string name="Name">Builder</string><ProtectedString name="Source"><![CDATA[--!nonstrict
+--[[
+	Builder context (`ctx`) — the only way components create geometry.
+
+	Anchors: every call takes an ANCHOR = { part = BasePart, cf = CFrame, side = ±1 }
+	(or a base part name / BasePart). Positions and rotations are relative to the anchor.
+	While a sided component builds for the left side (ctx.side = -1), X positions and Y/Z
+	rotations are mirrored automatically, so components are authored once (right side).
+	ctx.scale (Vector3) multiplies positions and sizes (used for mass: arm thickness etc.).
+
+	Every piece is Massless, non-colliding, welded (Weld.C0 = offset) to exactly one part.
+]]
+
+local CollectionService = game:GetService("CollectionService")
+
+local Util = require(script.Parent.Util)
+local Rig = require(script.Parent.Rig)
+local BodyTypes = require(script.Parent.BodyTypes)
+
+local Builder = {}
+Builder.__index = Builder
+
+local MIN_SIZE = 0.05
+
+function Builder.new(state)
+	local self = setmetatable({}, Builder)
+	self.state = state
+	self.character = state.character
+	self.curse = state.curse
+	self.body = state.body
+	self.layout = state.layout
+	self.palette = state.palette
+	self.grade = state.grade
+	self.appearance = state.effective
+	self.side = 1
+	self.sideName = nil -- "Right" / "Left" while building a sided component
+	self.suffix = "R"
+	self.scale = Vector3.one
+	self.folder = nil
+	self.owner = "Rig"
+	self.count = 0
+	self.random = Random.new(state.effective.Seed or 1)
+	return self
+end
+
+---------------------------------------------------------------------------- state
+
+function Builder:m(key)
+	return BodyTypes.get(self.body, key, self.sideName)
+end
+
+function Builder:rand(a, b)
+	return a + (b - a) * self.random:NextNumber()
+end
+
+function Builder:randInt(a, b)
+	return self.random:NextInteger(a, b)
+end
+
+-- Run fn with temporary context fields (side, scale, …) and restore them after.
+function Builder:with(fields, fn, ...)
+	local saved = {}
+	for k, v in pairs(fields) do
+		saved[k] = self[k]
+		self[k] = v
+	end
+	local results = table.pack(pcall(fn, ...))
+	for k, v in pairs(saved) do
+		self[k] = v
+	end
+	if not results[1] then
+		error(results[2], 0)
+	end
+	return table.unpack(results, 2, results.n)
+end
+
+function Builder:look(role)
+	return self.palette[role] or self.palette.Skin
+end
+
+---------------------------------------------------------------------------- anchors
+
+function Builder:basePart(name)
+	return self.character:FindFirstChild(name) or self.curse:FindFirstChild(name, true)
+end
+
+function Builder:anchor(target, cf, side)
+	if typeof(target) ~= "Instance" and type(target) == "table" then
+		return target -- already an anchor
+	end
+	local part = target
+	if type(target) == "string" then
+		part = self:basePart(target)
+		assert(part, "no part named " .. target)
+	end
+	return { part = part, cf = cf or CFrame.identity, side = side or 1 }
+end
+
+-- anchor offset by a local position/rotation (mirrored for the left side)
+function Builder:sub(target, pos, rot)
+	local a = self:anchor(target)
+	return { part = a.part, cf = a.cf * self:localCF(pos, rot), side = a.side }
+end
+
+function Builder:localCF(pos, rot)
+	local s = self.scale
+	local x, y, z = 0, 0, 0
+	if pos then
+		x, y, z = pos[1] * s.X, pos[2] * s.Y, pos[3] * s.Z
+	end
+	local rx, ry, rz = 0, 0, 0
+	if rot then
+		rx, ry, rz = rot[1] or 0, rot[2] or 0, rot[3] or 0
+	end
+	if self.side < 0 then
+		x, ry, rz = -x, -ry, -rz
+	end
+	return CFrame.new(x, y, z) * CFrame.Angles(math.rad(rx), math.rad(ry), math.rad(rz))
+end
+
+function Builder:scaledSize(size)
+	local v = Util.v3(size)
+	local s = self.scale
+	return Vector3.new(
+		math.max(math.abs(v.X * s.X), MIN_SIZE),
+		math.max(math.abs(v.Y * s.Y), MIN_SIZE),
+		math.max(math.abs(v.Z * s.Z), MIN_SIZE)
+	)
+end
+
+---------------------------------------------------------------------------- pieces
+
+local function configure(p)
+	p.Anchored = false
+	p.CanCollide = false
+	p.CanTouch = false
+	p.CanQuery = false
+	p.Massless = true
+	p.TopSurface = Enum.SurfaceType.Smooth
+	p.BottomSurface = Enum.SurfaceType.Smooth
+end
+
+function Builder:attach(p, anchor, offset)
+	configure(p)
+	p.CFrame = anchor.part.CFrame * offset
+	local weld = Instance.new("Weld")
+	weld.Name = "CurseWeld"
+	weld.Part0 = anchor.part
+	weld.Part1 = p
+	weld.C0 = offset
+	weld.Parent = p
+	p.Parent = self.folder
+	return p
+end
+
+-- piece at an explicit offset (anchor space) with a final (already scaled) size
+function Builder:_pieceAt(className, anchor, offset, size, role, name)
+	local look = self:look(role or "Skin")
+	local p = Instance.new(className)
+	self.count += 1
+	p.Name = name or (self.owner .. "_" .. self.count)
+	p.Size = Vector3.new(math.max(size.X, MIN_SIZE), math.max(size.Y, MIN_SIZE), math.max(size.Z, MIN_SIZE))
+	p.Color = look.Color
+	p.Material = look.Material
+	p.Transparency = look.Transparency
+	p:SetAttribute("Role", role or "Skin")
+	return self:attach(p, anchor, anchor.cf * offset)
+end
+
+function Builder:_piece(className, target, pos, size, rot, role, name)
+	local anchor = self:anchor(target)
+	return self:_pieceAt(className, anchor, self:localCF(pos, rot), self:scaledSize(size), role, name)
+end
+
+local function sphereMesh(p)
+	local mesh = Instance.new("SpecialMesh")
+	mesh.MeshType = Enum.MeshType.Sphere
+	mesh.Parent = p
+	return p
+end
+
+-- frame whose +Y runs from a to b (anchor-local, mirrored/scaled like positions)
+function Builder:spanCF(a, b, roll)
+	local pa, pb = self:localCF(a).Position, self:localCF(b).Position
+	local dir = pb - pa
+	local len = dir.Magnitude
+	if len < 1e-4 then
+		return nil, 0
+	end
+	local up = dir.Unit
+	local ref = math.abs(up.Z) < 0.9 and Vector3.zAxis or Vector3.xAxis
+	local right = up:Cross(ref).Unit
+	local cf = CFrame.fromMatrix((pa + pb) / 2, right, up)
+	if roll and roll ~= 0 then
+		cf = cf * CFrame.Angles(0, math.rad(roll * self.side), 0)
+	end
+	return cf, len
+end
+
+--[[
+	Ellipsoid spanning a → b (anchor space). radius: number or {rx, rz}.
+	opts.stretch (default 1.2) lengthens it past the endpoints so chains overlap.
+]]
+function Builder:capsule(target, a, b, radius, role, opts)
+	opts = opts or {}
+	local anchor = self:anchor(target)
+	local cf, len = self:spanCF(a, b, opts.roll)
+	if not cf then
+		return nil
+	end
+	local s = self.scale
+	local rs = (math.abs(s.X) + math.abs(s.Z)) / 2
+	local rx, rz = radius, radius
+	if type(radius) == "table" then
+		rx, rz = radius[1], radius[2]
+	end
+	local size = Vector3.new(2 * rx * rs, len * (opts.stretch or 1.2), 2 * rz * rs)
+	local className = opts.shape == "box" and "Part" or opts.shape == "wedge" and "WedgePart" or "Part"
+	local p = self:_pieceAt(className, anchor, cf, size, role, opts.name)
+	if opts.shape == nil or opts.shape == "blob" then
+		sphereMesh(p)
+	end
+	return p
+end
+
+--[[
+	Tapered tube through a list of points with matching radii (numbers or {rx, rz}).
+	roles: a role string or a function(i, n) → role. Used for horns, fingers, tendrils.
+]]
+function Builder:tube(target, points, radii, role, opts)
+	opts = opts or {}
+	local out = {}
+	local n = #points - 1
+	for i = 1, n do
+		local r = radii[i]
+		local rn = radii[i + 1] or r
+		if type(r) == "number" and type(rn) == "number" then
+			r = (r + rn) / 2
+		end
+		local rl = type(role) == "function" and role(i, n) or role
+		out[i] = self:capsule(target, points[i], points[i + 1], r, rl, { stretch = opts.stretch or 1.3, roll = opts.roll })
+	end
+	return out
+end
+
+-- Ellipsoid: the organic workhorse.
+function Builder:blob(target, pos, size, rot, role, name)
+	return sphereMesh(self:_piece("Part", target, pos, size, rot, role, name))
+end
+
+function Builder:box(target, pos, size, rot, role, name)
+	return self:_piece("Part", target, pos, size, rot, role, name)
+end
+
+-- WedgePart: slope rises from the front-bottom edge to the back-top edge.
+function Builder:wedge(target, pos, size, rot, role, name)
+	return self:_piece("WedgePart", target, pos, size, rot, role, name)
+end
+
+-- Cylinder along its local X axis.
+function Builder:cylinder(target, pos, size, rot, role, name)
+	local p = self:_piece("Part", target, pos, size, rot, role, name)
+	p.Shape = Enum.PartType.Cylinder
+	return p
+end
+
+-- Custom art: a FileMesh (MeshId is settable at runtime on SpecialMesh).
+function Builder:mesh(target, pos, size, rot, meshId, role, textureId, meshScale)
+	local p = self:_piece("Part", target, pos, size, rot, role)
+	local mesh = Instance.new("SpecialMesh")
+	mesh.MeshType = Enum.MeshType.FileMesh
+	mesh.MeshId = meshId
+	mesh.TextureId = textureId or ""
+	mesh.Scale = Util.v3(meshScale, Vector3.one)
+	mesh.Parent = p
+	return p
+end
+
+-- Clone a MeshPart / Model from CurseBody/Assets and weld it (hand-made art).
+function Builder:template(assetName, target, pos, rot, role)
+	local assets = script.Parent:FindFirstChild("Assets")
+	local source = assets and assets:FindFirstChild(assetName, true)
+	if not source then
+		warn("[CurseBody] missing asset " .. tostring(assetName))
+		return nil
+	end
+	local anchor = self:anchor(target)
+	local clone = source:Clone()
+	local offset = anchor.cf * self:localCF(pos, rot)
+	local parts = clone:IsA("BasePart") and { clone } or {}
+	for _, d in ipairs(clone:GetDescendants()) do
+		if d:IsA("BasePart") then
+			table.insert(parts, d)
+		end
+	end
+	local pivot = clone:IsA("Model") and clone:GetPivot() or clone.CFrame
+	for _, p in ipairs(parts) do
+		local rel = pivot:ToObjectSpace(p.CFrame)
+		if role then
+			local look = self:look(role)
+			p.Color, p.Material = look.Color, look.Material
+		end
+		p.Parent = nil
+		self:attach(p, anchor, offset * rel)
+	end
+	clone:Destroy()
+	return parts
+end
+
+--[[
+	Triangle between three points (anchor space, mirrored like positions) from two
+	WedgeParts. Used for membranes, blades, fins and teeth.
+]]
+function Builder:triangle(target, a, b, c, role, thickness)
+	local anchor = self:anchor(target)
+	local function pt(v)
+		local cf = self:localCF(v)
+		return cf.Position
+	end
+	a, b, c = pt(a), pt(b), pt(c)
+	local ab, ac, bc = b - a, c - a, c - b
+	local abd, acd, bcd = ab:Dot(ab), ac:Dot(ac), bc:Dot(bc)
+	if abd > acd and abd > bcd then
+		c, a = a, c
+	elseif acd > bcd and acd > abd then
+		a, b = b, a
+	end
+	ab, ac, bc = b - a, c - a, c - b
+	if ac:Cross(ab).Magnitude < 1e-4 then
+		return
+	end
+	local right = ac:Cross(ab).Unit
+	local up = bc:Cross(right).Unit
+	local back = bc.Unit
+	local height = math.abs(ab:Dot(up))
+	local look = self:look(role or "Membrane")
+	local t = thickness or 0.05
+	local out = {}
+	for i, spec in ipairs({
+		{ Vector3.new(t, height, math.abs(ab:Dot(back))), CFrame.fromMatrix((a + b) / 2, right, up, back) },
+		{ Vector3.new(t, height, math.abs(ac:Dot(back))), CFrame.fromMatrix((a + c) / 2, -right, up, -back) },
+	}) do
+		local w = Instance.new("WedgePart")
+		self.count += 1
+		w.Name = self.owner .. "_Tri" .. self.count .. "_" .. i
+		w.Size = Vector3.new(math.max(spec[1].X, MIN_SIZE), math.max(spec[1].Y, MIN_SIZE), math.max(spec[1].Z, MIN_SIZE))
+		w.Color, w.Material, w.Transparency = look.Color, look.Material, look.Transparency
+		w:SetAttribute("Role", role or "Membrane")
+		out[i] = self:attach(w, anchor, anchor.cf * spec[2])
+	end
+	return out
+end
+
+---------------------------------------------------------------------------- sockets
+
+function Builder:sideName(side)
+	return (side or self.side) > 0 and "Right" or "Left"
+end
+
+-- Name for a sided socket: "Hand" → "Hand_R" / "Hand_L" / "Hand_E1" (extra limbs)
+function Builder:sided(base)
+	return base .. "_" .. self.suffix
+end
+
+function Builder:defineSocket(name, target, pos, rot)
+	name = (self.socketPrefix or "") .. name
+	local anchor = self:anchor(target)
+	local cf = anchor.cf * self:localCF(pos, rot)
+	local socket = { part = anchor.part, cf = cf, side = self.side * (anchor.side or 1), owner = self.owner }
+	self.state.sockets[name] = socket
+	local attName = "CurseSocket_" .. name
+	local old = anchor.part:FindFirstChild(attName)
+	if old then
+		old:Destroy()
+	end
+	local att = Instance.new("Attachment")
+	att.Name = attName
+	att.CFrame = cf
+	att:SetAttribute("Owner", self.owner)
+	att.Parent = anchor.part
+	return socket
+end
+
+-- Define a right socket at pos and its mirrored left twin (names + "R" / "L").
+function Builder:defineSocketPair(base, target, pos, rot)
+	self:with({ side = 1 }, function()
+		self:defineSocket(base .. "R", target, pos, rot)
+	end)
+	self:with({ side = -1 }, function()
+		self:defineSocket(base .. "L", target, pos, rot)
+	end)
+end
+
+function Builder:hasSocket(name)
+	local sockets, defaults = self.state.sockets, self.state.defaultSockets
+	return sockets[(self.socketPrefix or "") .. name] ~= nil or sockets[name] ~= nil or defaults[name] ~= nil
+end
+
+-- Resolve a socket to an anchor. Unknown names fall back to `fallback` then "Chest".
+function Builder:socket(name, fallback)
+	local sockets = self.state.sockets
+	local s = (self.socketPrefix and sockets[self.socketPrefix .. name]) or sockets[name] or self.state.defaultSockets[name]
+	if not s and fallback then
+		s = self.state.sockets[fallback] or self.state.defaultSockets[fallback]
+	end
+	if not s then
+		s = self.state.sockets.Chest or self.state.defaultSockets.Chest
+	end
+	return { part = s.part, cf = s.cf, side = s.side or 1 }
+end
+
+---------------------------------------------------------------------------- chains
+
+--[[
+	Motor6D chain for tails, tendrils, tentacles, stalks, wing bones.
+	segments: { { length, radius, {rx, ry, rz} }, … } — each segment hangs along -Y
+	from the end of the previous one, rotated by its angles.
+	opts: name, lengthScale, radiusScale, role, flesh (false | function(ctx, anchor, i, len, r, n)),
+	      sway = { amp = degrees, speed = hz } (procedural motion on clients), mirror joint etc.
+	Returns { { anchor =, length =, radius = }, … }
+]]
+function Builder:chain(target, pos, rot, segments, opts)
+	opts = opts or {}
+	local anchor = self:anchor(target)
+	local parentPart = anchor.part
+	local c0First = anchor.cf * self:localCF(pos, rot)
+	self.count += 1
+	local baseName = (opts.name or (self.owner .. "Chain")) .. self.count
+	local ls, rs = opts.lengthScale or 1, opts.radiusScale or 1
+	local out, prevLen = {}, nil
+	local n = #segments
+	for i, seg in ipairs(segments) do
+		local len, r = seg[1] * ls, seg[2] * rs
+		local jp = Instance.new("Part")
+		jp.Name = baseName .. "_" .. i
+		jp.Size = Vector3.new(math.max(r * 2, MIN_SIZE), math.max(len, MIN_SIZE), math.max(r * 2, MIN_SIZE))
+		jp.Transparency = 1
+		configure(jp)
+		local segRot = self:localCF(nil, seg[3])
+		local c0 = (i == 1 and c0First or CFrame.new(0, -prevLen / 2, 0)) * segRot
+		local c1 = CFrame.new(0, len / 2, 0)
+		jp.CFrame = parentPart.CFrame * c0 * c1:Inverse()
+		local motor = Instance.new("Motor6D")
+		motor.Name = baseName .. "_Joint" .. i
+		motor.Part0, motor.Part1, motor.C0, motor.C1 = parentPart, jp, c0, c1
+		motor.Parent = jp -- lives (and dies) with its slot folder
+		if opts.sway ~= false then
+			local sway = opts.sway or {}
+			motor:SetAttribute("SwayAmp", (sway.amp or 6) * (0.6 + 0.4 * i / n))
+			motor:SetAttribute("SwaySpeed", sway.speed or 1.6)
+			motor:SetAttribute("SwayPhase", i * (sway.phase or 0.6) + self.count)
+			CollectionService:AddTag(motor, "CurseSway")
+		end
+		jp.Parent = self.folder
+		local segAnchor = { part = jp, cf = CFrame.identity, side = self.side }
+		out[i] = { anchor = segAnchor, length = len, radius = r }
+		if opts.flesh ~= false then
+			self:with({ scale = Vector3.one, side = 1 }, function()
+				if opts.flesh then
+					opts.flesh(self, segAnchor, i, len, r, n)
+				else
+					self:blob(segAnchor, { 0, 0, 0 }, { r * 2, len * 1.35, r * 2 }, nil,
+						opts.role or (i % 2 == 0 and "SkinLight" or "Skin"))
+				end
+			end)
+		end
+		parentPart, prevLen = jp, len
+	end
+	return out
+end
+
+---------------------------------------------------------------------------- limbs
+
+--[[
+	Extra R6-style limb driven by its own Motor6D from the Torso.
+	kind "Arm" | "Leg" | "Head". The client mirrors `mirrorJoint`'s animation onto it
+	(attributes MirrorJoint / MirrorDelay / MirrorScale) unless an animation keys it.
+]]
+function Builder:limb(kind, name, side, c0pos, mirrorJoint, opts)
+	opts = opts or {}
+	local torso = self.character.Torso
+	local size = kind == "Head" and Vector3.new(2, 1, 1) or Vector3.new(1, 2, 1)
+	local p = Instance.new("Part")
+	p.Name = name
+	p.Size = size
+	p.Transparency = 1
+	configure(p)
+	local rot = kind == "Head" and Rig.ROT.root or (side > 0 and Rig.ROT.right or Rig.ROT.left)
+	local c1pos = kind == "Arm" and Vector3.new(-0.5 * side, 0.5, 0)
+		or kind == "Leg" and Vector3.new(0.5 * side, 1, 0)
+		or Vector3.new(0, -0.5, 0)
+	local splay = CFrame.Angles(math.rad(opts.tilt or 0), math.rad(opts.yaw or 0), math.rad((opts.splay or 0) * side))
+	local motor = Instance.new("Motor6D")
+	motor.Name = name .. "Joint"
+	motor.Part0 = torso
+	motor.Part1 = p
+	motor.C0 = CFrame.new(c0pos) * splay * rot
+	motor.C1 = CFrame.new(c1pos) * rot
+	motor.MaxVelocity = 0.1
+	motor:SetAttribute("MirrorJoint", mirrorJoint)
+	motor:SetAttribute("MirrorDelay", opts.delay or 0.12)
+	motor:SetAttribute("MirrorScale", opts.mirrorScale or 1)
+	CollectionService:AddTag(motor, "CurseMirror")
+	p.CFrame = torso.CFrame * motor.C0 * motor.C1:Inverse()
+	motor.Parent = p
+	p.Parent = self.folder
+	return p
+end
+
+---------------------------------------------------------------------------- composition
+
+-- Build another component inline (horn sets build horns, extra arms build arms …).
+function Builder:build(id, entry, overrides)
+	return self.state.buildComponent(self, id, entry or {}, overrides)
+end
+
+return Builder
+]]></ProtectedString></Properties></Item><Item class="Folder" referent="RBX11"><Properties><string name="Name">Catalog</string></Properties><Item class="ModuleScript" referent="RBX3"><Properties><string name="Name">Body</string><ProtectedString name="Source"><![CDATA[--!nonstrict
+--[[
+	Torso growths, back parts, tails and disfigurements. All placed at sockets (ctx.at).
+	Back-facing socket frame: +Y = away from the back, +X = right, -Z = up.
+]]
+
+local A = require(script.Parent._Anatomy)
+
+local TORSO = { "TorsoGrowths", "Disfigurements" }
+local DISFIG = { "Disfigurements" }
+
+return function(R)
+	---------------------------------------------------------------- torso growths
+	R.register({
+		id = "ChestCavity",
+		slots = TORSO,
+		grade = "Grade3",
+		tags = { "void", "reference" },
+		params = { socket = "Chest", width = 1.3, height = 1.9, teeth = false, organs = false },
+		build = function(ctx, p)
+			local at, w, h = A.at(ctx), p.width, p.height
+			ctx:blob(at, { 0, -0.04, 0 }, { w * 1.12, 0.36, h * 1.08 }, { 0, 0, 0 }, "VoidRim")
+			ctx:blob(at, { 0, 0.03, 0 }, { w, 0.32, h }, nil, "Void")
+			ctx:blob(at, { 0.05, 0.0, -h * 0.5 }, { w * 0.35, 0.24, h * 0.42 }, nil, "Void")
+			if p.teeth then
+				for i = 1, 12 do
+					local a = i / 12 * math.pi * 2
+					local ox, oz = math.cos(a) * w * 0.52, math.sin(a) * h * 0.5
+					ctx:tube(at, { { ox, 0.05, oz }, { ox * 0.75, 0.22, oz * 0.75 }, { ox * 0.55, 0.18, oz * 0.55 } },
+						{ 0.07, 0.05, 0.015 }, "Bone")
+				end
+			end
+			if p.organs then
+				ctx:blob(at, { -0.15 * w, 0.12, 0.2 * h }, { 0.4 * w, 0.25, 0.3 * h }, nil, "SkinLight")
+				ctx:blob(at, { 0.2 * w, 0.1, 0.25 * h }, { 0.3 * w, 0.22, 0.35 * h }, nil, "FleshDark")
+				local loops = {}
+				for k = 0, 6 do
+					table.insert(loops, { math.sin(k * 1.3) * 0.25 * w, 0.14, -0.05 * h - k * 0.05 * h })
+				end
+				ctx:tube(at, loops, { 0.1, 0.1, 0.1, 0.1, 0.1, 0.1, 0.1 }, "Flesh")
+			end
+		end,
+	})
+	R.variant("ChestCavity", { id = "OpenChest", grade = "Grade2", params = { width = 1.5, height = 2.0, teeth = true } })
+	R.variant("ChestCavity", { id = "ExposedOrgans", grade = "Grade2", params = { width = 1.2, height = 1.6, organs = true } })
+
+	R.register({
+		id = "BonePlating",
+		slots = TORSO,
+		grade = "Grade3",
+		tags = { "bone", "armor" },
+		params = { socket = "Chest" },
+		build = function(ctx)
+			local at = A.at(ctx)
+			for row = 0, 2 do
+				for col = -1, 1, 2 do
+					ctx:blob(at, { col * 0.38, 0.08 + row * 0.02, 0.35 - row * 0.42 }, { 0.72, 0.16, 0.5 }, { 8, 0, col * 8 }, "Bone")
+					ctx:blob(at, { col * 0.38, 0.1 + row * 0.02, 0.12 - row * 0.42 }, { 0.7, 0.1, 0.1 }, nil, "BoneDark")
+				end
+			end
+			for _, name in ipairs({ "ShoulderR", "ShoulderL" }) do
+				local s = ctx:socket(name)
+				ctx:blob(s, { 0, 0.12, 0 }, { 1.0, 0.25, 0.9 }, nil, "Bone")
+				ctx:blob(s, { 0.1, 0.2, 0.25 }, { 0.6, 0.15, 0.5 }, nil, "BoneDark")
+			end
+		end,
+	})
+
+	R.register({
+		id = "OrganicArmor",
+		slots = TORSO,
+		grade = "Grade2",
+		tags = { "armor", "insect" },
+		params = { socket = "Chest" },
+		build = function(ctx)
+			local at = A.at(ctx)
+			for row = 0, 4 do
+				local w = 1.3 - math.abs(row - 1.5) * 0.18
+				ctx:blob(at, { 0, 0.1, 0.45 - row * 0.3 }, { w, 0.14, 0.36 }, { 12, 0, 0 }, row % 2 == 0 and "SkinDark" or "SkinDeep")
+			end
+			local back = ctx:socket("Back")
+			for row = 0, 3 do
+				ctx:blob(back, { 0, 0.1, -0.5 + row * 0.35 }, { 1.4, 0.16, 0.42 }, { -10, 0, 0 }, "SkinDark")
+			end
+		end,
+	})
+
+	R.register({
+		id = "RibGrowth",
+		slots = TORSO,
+		grade = "Grade3",
+		tags = { "bone" },
+		count = 2,
+		params = { socket = "FlankR", ribs = 4, length = 0.8 },
+		build = function(ctx, p)
+			for _, name in ipairs({ "FlankR", "FlankL" }) do
+				local s = ctx:socket(name)
+				ctx:with({ side = s.side }, function()
+					ctx:blob(s, { 0, 0, 0 }, { 0.4, 0.2, 1.1 }, nil, "SkinDeep")
+					for i = 1, p.ribs do
+						local z = (i - (p.ribs + 1) / 2) * 0.26
+						ctx:tube(s, { { 0, 0, z }, { 0.05, p.length * 0.55, z - 0.12 }, { -0.1, p.length * 0.8, z - 0.45 },
+							{ -0.35, p.length * 0.75, z - 0.7 } }, { 0.08, 0.07, 0.05, 0.02 }, "Bone")
+					end
+				end)
+			end
+		end,
+	})
+
+	R.register({
+		id = "ShoulderGrowth",
+		slots = TORSO,
+		grade = "Grade3",
+		tags = { "flesh", "growth" },
+		params = { socket = "ShoulderR", size = 1.3, eyes = 2 },
+		build = function(ctx, p)
+			local at, s = A.at(ctx), p.size
+			ctx:blob(at, { 0, 0.25 * s, 0 }, { 1.4 * s, 1.0 * s, 1.3 * s }, nil, "Skin")
+			ctx:blob(at, { 0.3 * s, 0.55 * s, 0.2 * s }, { 0.8 * s, 0.6 * s, 0.7 * s }, nil, "SkinLight")
+			ctx:blob(at, { -0.25 * s, 0.4 * s, -0.35 * s }, { 0.6 * s, 0.5 * s, 0.55 * s }, nil, "Flesh")
+			for i = 1, p.eyes do
+				local e = ctx:sub(at, { 0.15 * s * i - 0.2, 0.55 * s, -0.5 * s }, { -70, 0, 0 })
+				ctx:blob(e, { 0, 0, 0 }, { 0.2, 0.12, 0.18 }, nil, "Eye")
+				ctx:blob(e, { 0, 0.05, 0 }, { 0.06, 0.05, 0.1 }, nil, "Pupil")
+			end
+		end,
+	})
+
+	R.register({
+		id = "SecondaryMass",
+		slots = TORSO,
+		grade = "Grade1",
+		tags = { "abnormal", "flesh" },
+		params = { socket = "BackR", size = 1 },
+		build = function(ctx, p)
+			local at, s = A.at(ctx), p.size
+			ctx:blob(at, { 0, 0.5 * s, 0 }, { 1.7 * s, 1.3 * s, 1.9 * s }, nil, "Skin")
+			ctx:blob(at, { 0.2 * s, 0.9 * s, -0.4 * s }, { 1.0 * s, 0.7 * s, 0.9 * s }, nil, "SkinLight")
+			ctx:blob(at, { -0.3 * s, 0.85 * s, 0.3 * s }, { 0.9 * s, 0.4 * s, 0.7 * s }, nil, "Flesh")
+			ctx:tube(at, { { 0.5 * s, 0.7 * s, 0.2 * s }, { 0.9 * s, 0.8 * s, 0.6 * s }, { 1.0 * s, 0.6 * s, 1.0 * s } },
+				{ 0.25 * s, 0.2 * s, 0.14 * s }, "Skin")
+			local e = ctx:sub(at, { 0, 1.15 * s, -0.2 * s })
+			ctx:blob(e, { 0, 0, 0 }, { 0.3, 0.14, 0.26 }, nil, "Eye")
+			ctx:blob(e, { 0, 0.06, 0 }, { 0.09, 0.06, 0.16 }, nil, "Pupil")
+		end,
+	})
+
+	---------------------------------------------------------------- back
+	local function wing(ctx, p, bones)
+		local at = A.at(ctx)
+		local root = ctx:chain(at, { 0, 0, 0 }, nil, { { 0.1, 0.1, { 0, 0, 0 } } },
+			{ name = "Wing", flesh = false, sway = { amp = 7, speed = 0.7 } })[1].anchor
+		local S = p.span
+		local base = { 0, 0.05, 0 }
+		local E, W = { 0.9 * S, 0.5 * S, -0.7 * S }, { 1.6 * S, 0.45 * S, -1.1 * S }
+		local tips = { { 2.6 * S, 0.5 * S, -1.6 * S }, { 3.0 * S, 0.6 * S, -0.6 * S }, { 2.6 * S, 0.6 * S, 0.4 * S }, { 1.6 * S, 0.5 * S, 0.9 * S } }
+		do
+			ctx:blob(root, base, { 0.55, 0.5, 0.6 }, nil, "Skin")
+			ctx:tube(root, { base, E, W }, { 0.16, 0.12, 0.1 }, bones and "Bone" or "SkinDark")
+			for _, t in ipairs(tips) do
+				ctx:tube(root, { W, A.lerp(W, t, 0.55), t }, { 0.08, 0.06, 0.02 }, bones and "Bone" or "SkinDark")
+				if bones then
+					ctx:tube(root, { t, A.add(t, { 0.25, 0.05, -0.1 }) }, { 0.05, 0.01 }, "BoneDark")
+				end
+			end
+			if not bones then
+				ctx:triangle(root, W, tips[1], tips[2], "Membrane", 0.04)
+				ctx:triangle(root, W, tips[2], tips[3], "Membrane", 0.04)
+				ctx:triangle(root, W, tips[3], tips[4], "Membrane", 0.04)
+				ctx:triangle(root, base, W, tips[4], "Membrane", 0.04)
+				ctx:triangle(root, base, E, W, "Membrane", 0.04)
+			end
+		end
+	end
+
+	for _, def in ipairs({
+		{ id = "Wing", grade = "Grade2", bones = false },
+		{ id = "BoneWing", grade = "Grade1", bones = true },
+	}) do
+		R.register({
+			id = def.id,
+			slots = { "Back" },
+			grade = def.grade,
+			tags = { "wing" },
+			params = { socket = "BackR", span = 1 },
+			build = function(ctx, p)
+				wing(ctx, p, def.bones)
+			end,
+		})
+	end
+	for _, def in ipairs({ { id = "Wings", part = "Wing", grade = "Grade2" }, { id = "BoneWings", part = "BoneWing", grade = "Grade1" } }) do
+		R.register({
+			id = def.id,
+			slots = { "Back" },
+			grade = def.grade,
+			tags = { "wing", "pair" },
+			count = 2,
+			params = { socket = "BackR", span = 1 },
+			build = function(ctx, p)
+				local scale = { ctx.scale.X, ctx.scale.Y, ctx.scale.Z }
+				for _, socket in ipairs({ "BackR", "BackL" }) do
+					ctx.state.buildEntry(ctx, { id = def.part, socket = socket, params = { span = p.span }, scale = scale })
+				end
+			end,
+		})
+	end
+
+	R.register({
+		id = "Tendrils",
+		slots = { "Back" },
+		grade = "Grade2",
+		tags = { "tendril" },
+		params = { socket = "UpperBack", count = 4, length = 2.4 },
+		build = function(ctx, p)
+			local at = A.at(ctx)
+			for i = 1, p.count do
+				local k = p.count == 1 and 0 or (i - 1) / (p.count - 1) * 2 - 1
+				local segs = {}
+				for s = 1, 6 do
+					table.insert(segs, { p.length / 6, 0.16 * (1 - 0.13 * s), { s == 1 and 0 or -14, 0, s == 1 and 0 or k * 6 } })
+				end
+				ctx:chain(at, { k * 0.5, 0, 0.1 * math.abs(k) }, { 180 + 40, 0, k * 35 }, segs,
+					{ name = "Tendril", sway = { amp = 10, speed = 1.0 + i * 0.1 } })
+			end
+		end,
+	})
+
+	R.register({
+		id = "Spikes",
+		slots = { "Back", "Disfigurements" },
+		grade = "Grade3",
+		tags = { "bone", "spine" },
+		params = { socket = "UpperBack", count = 5, length = 0.7 },
+		build = function(ctx, p)
+			local top, low = ctx:socket("UpperBack"), ctx:socket("LowerBack")
+			local torso = ctx.character.Torso
+			for i = 1, p.count do
+				local t = (i - 1) / math.max(1, p.count - 1)
+				local cf = top.cf:Lerp(low.cf, t)
+				local anchor = { part = torso, cf = cf, side = 1 }
+				local L = p.length * (1 - 0.45 * t) * ctx.scale.Y
+				ctx:blob(anchor, { 0, 0, 0 }, { 0.3, 0.15, 0.3 }, nil, "SkinDark")
+				ctx:tube(anchor, { { 0, 0, 0 }, { 0, L * 0.6, -0.12 }, { 0, L, -0.3 } }, { 0.1, 0.06, 0.01 }, "Bone")
+			end
+		end,
+	})
+
+	R.register({
+		id = "BackEyes",
+		slots = { "Back" },
+		grade = "Grade2",
+		tags = { "eye" },
+		count = 2,
+		params = { socket = "Back", eyes = 5 },
+		build = function(ctx, p)
+			local scale = { ctx.scale.X, ctx.scale.Y, ctx.scale.Z }
+			for _, socket in ipairs({ "BackR", "BackL", "Back" }) do
+				ctx.state.buildEntry(ctx, { id = "EyeCluster", socket = socket, params = { count = p.eyes, spread = 0.35 }, scale = scale })
+			end
+		end,
+	})
+
+	R.variant("Tumor", { id = "OrganicGrowth", grade = "Grade3", slots = { "Back", "TorsoGrowths", "Disfigurements" },
+		params = { socket = "BackL", size = 0.7, lumps = 7 } })
+
+	R.register({
+		id = "Shell",
+		slots = { "Back" },
+		grade = "Grade2",
+		tags = { "armor", "shell" },
+		params = { socket = "Back", size = 1 },
+		build = function(ctx, p)
+			local at, s = A.at(ctx), p.size * ctx:m("TorsoW")
+			ctx:blob(at, { 0, 0.1, -0.2 }, { 2.3 * s, 0.9, 2.4 }, nil, "SkinDark")
+			for row = 0, 3 do
+				ctx:blob(at, { 0, 0.4 - row * 0.05, -1.0 + row * 0.55 }, { (2.1 - row * 0.2) * s, 0.35, 0.7 }, { -12, 0, 0 },
+					row % 2 == 0 and "SkinDeep" or "SkinDark")
+				ctx:blob(at, { 0, 0.52 - row * 0.05, -0.75 + row * 0.55 }, { (1.9 - row * 0.2) * s, 0.12, 0.15 }, nil, "BoneDark")
+			end
+		end,
+	})
+
+	---------------------------------------------------------------- tails
+	R.register({
+		id = "Tail",
+		slots = { "Tails" },
+		grade = "Grade4",
+		tags = { "tail" },
+		params = {
+			socket = "TailRoot", segments = 6, length = 3.2, radius = 0.32, taper = 0.3, lift = 10, droop = 16,
+			curl = -30, side = 0, underside = true, spikes = false, bone = false, blade = false, claw = false, sway = 8,
+		},
+		build = function(ctx, p)
+			local at = A.at(ctx)
+			local index = (ctx.folder:GetAttribute("TailCount") or 0) + 1
+			ctx.folder:SetAttribute("TailCount", index)
+			local yaw = (index == 1) and 0 or (index % 2 == 0 and 1 or -1) * 22 * math.floor(index / 2)
+			local n = p.segments
+			local segs = {}
+			for i = 1, n do
+				local k = (i - 1) / (n - 1)
+				local rx = i == 1 and 0 or (i == n and p.curl or p.droop)
+				table.insert(segs, { p.length / n, p.radius * (1 - (1 - p.taper) * k), { rx, 0, i == 1 and 0 or p.side } })
+			end
+			local chain = ctx:chain(at, { 0, -0.05, 0 }, { 180 - p.lift, yaw, 0 }, segs, {
+				name = "Tail",
+				sway = { amp = p.sway, speed = 1.2 },
+				flesh = function(c, seg, i, len, r)
+					if p.bone then
+						c:blob(seg, { 0, 0, 0 }, { r * 1.5, len * 0.7, r * 1.5 }, nil, "Bone")
+						c:blob(seg, { 0, len * 0.42, 0 }, { r * 2, len * 0.2, r * 2 }, nil, "BoneDark")
+					else
+						c:blob(seg, { 0, 0, 0 }, { r * 2, len * 1.35, r * 2 }, nil, i % 2 == 0 and "SkinLight" or "Skin")
+						if p.underside then
+							c:blob(seg, { 0, 0, r * 0.35 }, { r * 1.4, len * 1.2, r * 1.4 }, nil, "SkinDark")
+						end
+					end
+					if p.spikes then
+						c:tube(seg, { { 0, 0, -r * 0.8 }, { 0, -len * 0.1, -r * 1.6 }, { 0, -len * 0.25, -r * 2.2 } }, { r * 0.35, r * 0.2, 0.02 }, "Bone")
+					end
+				end,
+			})
+			local tip = chain[#chain]
+			local e = { 0, -tip.length / 2, 0 }
+			if p.blade then
+				ctx:with({ side = 1, scale = Vector3.one }, function()
+					ctx:triangle(tip.anchor, A.add(e, { 0, 0.2, -0.05 }), A.add(e, { 0, -0.9, 0 }), A.add(e, { 0, 0.1, -0.55 }), "Claw", 0.06)
+					ctx:triangle(tip.anchor, A.add(e, { 0, 0.2, 0.05 }), A.add(e, { 0, -0.9, 0 }), A.add(e, { 0, 0.1, 0.55 }), "Claw", 0.06)
+				end)
+			elseif p.claw then
+				ctx:with({ side = 1, scale = Vector3.one }, function()
+					ctx:tube(tip.anchor, { e, A.add(e, { 0, -0.35, 0.02 }), A.add(e, { 0, -0.6, 0.12 }) }, { 0.1, 0.06, 0.015 }, "Claw")
+					ctx:capsule(tip.anchor, A.add(e, { 0, -0.45, 0.06 }), A.add(e, { 0, -0.62, 0.13 }), 0.025, "Teeth")
+				end)
+			end
+		end,
+	})
+	local function tail(id, grade, params)
+		R.variant("Tail", { id = id, grade = grade, params = params, tags = { "tail" } })
+	end
+	tail("ThinTail", "Grade4", { radius = 0.17, length = 2.6, taper = 0.25 })
+	tail("ThickTail", "Grade3", { radius = 0.55, length = 3.4, taper = 0.3, droop = 14, lift = 20 })
+	tail("LongTail", "Grade3", { radius = 0.28, length = 5.2, segments = 9, droop = 10 })
+	tail("BladeTail", "Grade2", { radius = 0.3, length = 3.6, blade = true, spikes = true, lift = 25, droop = 8, curl = 10 })
+	tail("BoneTail", "Grade2", { radius = 0.25, length = 3.6, segments = 9, bone = true, spikes = true, underside = false, droop = 10 })
+	tail("TendrilTail", "Grade3", { radius = 0.11, length = 4.2, segments = 10, taper = 0.3, droop = 9, curl = -20, sway = 14, underside = false })
+	tail("CreatureTail", "Grade3", { radius = 0.46, length = 4.4, segments = 5, taper = 0.33, lift = 0, droop = 30, curl = -85, side = -14, claw = true }) -- the reference
+
+	---------------------------------------------------------------- disfigurements
+	R.register({
+		id = "BoneProtrusion",
+		slots = DISFIG,
+		grade = "Grade3",
+		tags = { "bone" },
+		params = { socket = "Forearm_R", length = 0.7 },
+		build = function(ctx, p)
+			local at = A.at(ctx)
+			ctx:blob(at, { 0, 0, 0 }, { 0.42, 0.18, 0.42 }, nil, "SkinDeep")
+			ctx:blob(at, { 0, 0.02, 0 }, { 0.5, 0.1, 0.5 }, nil, "Flesh")
+			ctx:tube(at, { { 0, -0.05, 0 }, { 0.04, p.length * 0.55, 0.06 }, { 0.12, p.length, 0.15 } }, { 0.13, 0.08, 0.015 }, "Bone")
+		end,
+	})
+
+	R.variant("Tumor", { id = "Tumors", grade = "Grade2", slots = DISFIG, params = { socket = "Back", size = 0.55, lumps = 8 } })
+	R.variant("Tumor", { id = "FleshGrowth", grade = "Grade3", slots = DISFIG, params = { socket = "ChestR", size = 0.5, lumps = 5 } })
+
+	R.register({
+		id = "ExposedBone",
+		slots = DISFIG,
+		grade = "Grade3",
+		tags = { "bone", "wound" },
+		params = { socket = "UpperArm_R", length = 0.6 },
+		build = function(ctx, p)
+			local at = A.at(ctx)
+			ctx:blob(at, { 0, 0, 0 }, { 0.45, 0.12, p.length + 0.2 }, nil, "VoidRim")
+			ctx:blob(at, { 0, 0.03, 0 }, { 0.35, 0.1, p.length + 0.05 }, nil, "SkinDeep")
+			ctx:capsule(at, { 0, 0.07, -p.length / 2 }, { 0, 0.07, p.length / 2 }, 0.09, "Bone")
+		end,
+	})
+
+	R.register({
+		id = "ExposedTissue",
+		slots = DISFIG,
+		grade = "Grade4",
+		tags = { "flesh", "wound" },
+		params = { socket = "ChestL", size = 0.6 },
+		build = function(ctx, p)
+			local at, s = A.at(ctx), p.size
+			ctx:blob(at, { 0, 0, 0 }, { s * 1.1, 0.14, s * 1.3 }, nil, "SkinDark")
+			ctx:blob(at, { 0, 0.03, 0 }, { s, 0.12, s * 1.2 }, nil, "Flesh")
+			for i = 1, 3 do
+				ctx:blob(at, { 0, 0.07, (i - 2) * s * 0.3 }, { s * 0.8, 0.05, 0.06 }, nil, "FleshDark")
+			end
+		end,
+	})
+
+	R.register({
+		id = "CrackedFlesh",
+		slots = DISFIG,
+		grade = "Grade3",
+		tags = { "wound", "energy" },
+		params = { socket = "ChestR", size = 0.7, cracks = 3 },
+		build = function(ctx, p)
+			local at, s = A.at(ctx), p.size
+			for c = 1, p.cracks do
+				local pts = { { ctx:rand(-0.2, 0.2) * s, 0.02, ctx:rand(-0.2, 0.2) * s } }
+				local a = ctx:rand(0, math.pi * 2)
+				for k = 1, 4 do
+					a += ctx:rand(-0.9, 0.9)
+					local prev = pts[#pts]
+					table.insert(pts, { prev[1] + math.cos(a) * 0.18 * s, 0.02, prev[3] + math.sin(a) * 0.18 * s })
+				end
+				ctx:tube(at, pts, { 0.05, 0.045, 0.04, 0.03, 0.02 }, "VoidRim", { stretch = 1.1 })
+				ctx:tube(at, pts, { 0.025, 0.022, 0.02, 0.015, 0.01 }, c % 2 == 0 and "Glow" or "Void", { stretch = 1.05 })
+			end
+		end,
+	})
+
+	R.register({
+		id = "BlackenedFlesh",
+		slots = DISFIG,
+		grade = "Grade3",
+		tags = { "necrotic" },
+		params = { socket = "Back", size = 0.8, patches = 6 },
+		build = function(ctx, p)
+			local at, s = A.at(ctx), p.size
+			local roles = { "SkinDeep", "Void", "Spot", "SkinDeep" }
+			for i = 1, p.patches do
+				local r = ctx:rand(0.25, 0.5) * s
+				ctx:blob(at, { ctx:rand(-0.4, 0.4) * s, 0.02, ctx:rand(-0.4, 0.4) * s }, { r, 0.09, r * ctx:rand(0.7, 1.3) },
+					{ 0, ctx:rand(0, 180), 0 }, roles[(i - 1) % #roles + 1])
+			end
+		end,
+	})
+
+	R.variant("Spikes", { id = "SpineGrowth", grade = "Grade2", slots = DISFIG, params = { count = 7, length = 0.5 } })
+
+	R.register({
+		id = "ExtraFinger",
+		slots = DISFIG,
+		grade = "Grade3",
+		tags = { "hand" },
+		params = { socket = "Hand_R", length = 0.5 },
+		build = function(ctx, p)
+			local at = A.at(ctx)
+			local L = p.length * ctx:m("Hand")
+			ctx:tube(at, { { 0.2, 0.3, -0.1 }, { 0.32, 0.3 + L * 0.5, -0.12 }, { 0.36, 0.3 + L, -0.05 } }, { 0.08, 0.07, 0.05 }, "SkinLight")
+			ctx:capsule(at, { 0.36, 0.3 + L, -0.05 }, { 0.38, 0.45 + L, 0 }, 0.04, "Claw")
+		end,
+	})
+
+	-- proportion mutators: they change the body before anything builds
+	local function sideMutator(id, grade, socket, changes, geometry)
+		R.register({
+			id = id,
+			slots = DISFIG,
+			grade = grade,
+			tags = { "mutation" },
+			params = { socket = socket },
+			mutate = function(body, _, entry)
+				local side = body.side[A.sideOf(entry)]
+				for key, mul in pairs(changes) do
+					side[key] = (side[key] or 1) * mul
+				end
+			end,
+			build = geometry,
+		})
+	end
+	sideMutator("SwollenHand", "Grade3", "Hand_R", { Hand = 1.6 })
+	sideMutator("ElongatedArm", "Grade3", "Shoulder_R", { ArmLength = 1.35 })
+	sideMutator("ShrunkenArm", "Grade3", "UpperArm_R", { ArmThick = 0.6, ArmLength = 0.8, Hand = 0.7 })
+	sideMutator("EnlargedMuscle", "Grade3", "UpperArm_R", { ArmThick = 1.35 })
+	sideMutator("AsymmetricShoulder", "Grade3", "ShoulderR", { Shoulder = 1.7, ArmThick = 1.1 }, function(ctx)
+		local at = A.at(ctx)
+		ctx:blob(at, { 0, 0.3, 0 }, { 1.3, 0.8, 1.2 }, nil, "Skin")
+		ctx:blob(at, { 0.2, 0.55, 0.1 }, { 0.8, 0.5, 0.7 }, nil, "SkinLight")
+	end)
+
+	R.register({
+		id = "MissingFingers",
+		slots = DISFIG,
+		grade = "Grade4",
+		tags = { "wound", "hand" },
+		params = { socket = "Hand_R", count = 2 },
+		mutate = function(body, p, entry)
+			body.flags = body.flags or {}
+			local key = "MissingFingers" .. A.sideOf(entry)
+			body.flags[key] = (body.flags[key] or 0) + p.count
+		end,
+	})
+end
+]]></ProtectedString></Properties></Item><Item class="ModuleScript" referent="RBX4"><Properties><string name="Name">Features</string><ProtectedString name="Source"><![CDATA[--!nonstrict
+--[[
+	Eyes, mouths and head growths. All of them are placed at a socket (ctx.at), so any
+	of them can go anywhere: an eye on the chest, a mouth on a palm, an ear on a shoulder.
+	Socket frame: +Y out of the surface, +X right, +Z "up the surface" (for front sockets).
+]]
+
+local A = require(script.Parent._Anatomy)
+
+local FEATURE = { "Eyes", "Disfigurements" }
+local MOUTH = { "Mouths", "Disfigurements" }
+local GROWTH = { "HeadGrowths", "Disfigurements" }
+
+-- one eye at an anchor (radius r)
+local function eye(ctx, at, r, p)
+	if p.ring ~= false then
+		ctx:blob(at, { 0, -0.02, 0 }, { 2.3 * r, 0.9 * r, 2.1 * r }, nil, "SkinDeep")
+	end
+	ctx:blob(at, { 0, 0.02, 0 }, { 2 * r, 1.2 * r, 1.8 * r }, nil, p.role or "Eye")
+	if p.pupil ~= false then
+		ctx:blob(at, { 0, 0.55 * r, 0 }, { 0.45 * r, 0.25 * r, 0.9 * r }, nil, "Pupil")
+	end
+	if p.lid ~= false then
+		ctx:blob(at, { 0, 0.15 * r, 0.75 * r }, { 2.4 * r, 1.0 * r, 0.9 * r }, { 10, 0, 0 }, "SkinDark")
+	end
+end
+
+return function(R)
+	---------------------------------------------------------------- eyes
+	R.register({
+		id = "Eye",
+		slots = FEATURE,
+		grade = "Grade4",
+		tags = { "eye" },
+		params = { size = 0.14, socket = "Face" },
+		build = function(ctx, p)
+			eye(ctx, A.at(ctx), p.size, p)
+		end,
+	})
+
+	R.register({
+		id = "GiantEye",
+		slots = FEATURE,
+		grade = "Grade3",
+		tags = { "eye" },
+		params = { size = 0.42, socket = "Face" },
+		build = function(ctx, p)
+			local at, r = A.at(ctx), p.size
+			ctx:blob(at, { 0, -0.05, 0 }, { 2.4 * r, 1.0 * r, 2.3 * r }, nil, "SkinDeep")
+			ctx:blob(at, { 0, 0.05, 0 }, { 2 * r, 1.25 * r, 2 * r }, nil, "Eye")
+			ctx:blob(at, { 0, 0.52 * r, 0 }, { 1.05 * r, 0.3 * r, 1.05 * r }, nil, "Glow")
+			ctx:blob(at, { 0, 0.62 * r, 0 }, { 0.45 * r, 0.25 * r, 0.75 * r }, nil, "Pupil")
+			ctx:blob(at, { 0, 0.2 * r, 0.85 * r }, { 2.5 * r, 1.0 * r, 0.8 * r }, { 12, 0, 0 }, "SkinDark")
+			ctx:blob(at, { 0, 0.15 * r, -0.9 * r }, { 2.3 * r, 0.8 * r, 0.6 * r }, { -12, 0, 0 }, "SkinDark")
+			for i = 1, 4 do
+				local a = i * 1.4
+				ctx:capsule(at, { math.cos(a) * 0.95 * r, 0.25 * r, math.sin(a) * 0.9 * r },
+					{ math.cos(a) * 0.6 * r, 0.45 * r, math.sin(a) * 0.55 * r }, 0.03, "SkinLight")
+			end
+		end,
+	})
+
+	R.register({
+		id = "EyeCluster",
+		slots = FEATURE,
+		grade = "Grade3",
+		tags = { "eye" },
+		params = { count = 5, spread = 0.4, size = 0.1, socket = "Face" },
+		count = function(p)
+			return p.count
+		end,
+		build = function(ctx, p)
+			local at = A.at(ctx)
+			for _, pt in ipairs(A.scatter(ctx, p.count, p.spread)) do
+				local r = p.size * ctx:rand(0.6, 1.4)
+				eye(ctx, ctx:sub(at, pt, { 0, ctx:rand(0, 360), 0 }), r, { lid = ctx:rand(0, 1) > 0.5 })
+			end
+		end,
+	})
+
+	R.register({
+		id = "EyeStalk",
+		slots = FEATURE,
+		grade = "Grade2",
+		tags = { "eye", "tendril" },
+		params = { length = 0.9, size = 0.12, socket = "Crown" },
+		build = function(ctx, p)
+			local at = A.at(ctx)
+			local seg = p.length / 3
+			local chain = ctx:chain(at, { 0, 0, 0 }, { 180 + ctx:rand(-20, 20), 0, ctx:rand(-25, 25) }, {
+				{ seg, 0.07, { 0, 0, 0 } }, { seg, 0.06, { 15, 0, 0 } }, { seg, 0.05, { 15, 0, 0 } },
+			}, { name = "EyeStalk", sway = { amp = 12, speed = 0.9 } })
+			local tip = chain[#chain]
+			eye(ctx, ctx:sub(tip.anchor, { 0, -tip.length / 2, 0 }, { 180, 0, 0 }), p.size, { lid = false })
+		end,
+	})
+
+	R.register({
+		id = "CompoundEye",
+		slots = FEATURE,
+		grade = "Grade3",
+		tags = { "eye", "insect" },
+		params = { size = 0.3, socket = "Face" },
+		build = function(ctx, p)
+			local at, r = A.at(ctx), p.size
+			ctx:blob(at, { 0, 0, 0 }, { 1.7 * r, 1.4 * r, 2.0 * r }, nil, "Void")
+			for i = 1, 7 do
+				local a = i * 2.4
+				local d = 0.45 * r * math.sqrt(i / 7)
+				ctx:blob(at, { math.cos(a) * d, 0.62 * r, math.sin(a) * d * 1.2 }, { 0.22 * r, 0.12 * r, 0.22 * r }, nil, "Eye")
+			end
+		end,
+	})
+
+	R.register({
+		id = "MissingEye",
+		slots = FEATURE,
+		grade = "Grade4",
+		tags = { "eye", "wound" },
+		params = { size = 0.16, socket = "Face" },
+		count = 0,
+		build = function(ctx, p)
+			local at, r = A.at(ctx), p.size
+			ctx:blob(at, { 0, 0, 0 }, { 2.3 * r, 0.8 * r, 2.0 * r }, nil, "SkinDark")
+			ctx:blob(at, { 0, 0.12 * r, 0 }, { 1.5 * r, 0.6 * r, 1.3 * r }, nil, "Void")
+			ctx:capsule(at, { -1.4 * r, 0.3 * r, 1.6 * r }, { 1.2 * r, 0.3 * r, -1.5 * r }, 0.025, "SkinLight")
+		end,
+	})
+
+	R.register({
+		id = "SlitEye",
+		slots = FEATURE,
+		grade = "Grade3",
+		tags = { "eye" },
+		params = { size = 0.18, socket = "Face" },
+		build = function(ctx, p)
+			local at, r = A.at(ctx), p.size
+			ctx:blob(at, { 0, 0, 0 }, { 2.2 * r, 0.7 * r, 1.0 * r }, nil, "SkinDark")
+			ctx:blob(at, { 0, 0.3 * r, 0 }, { 1.8 * r, 0.3 * r, 0.25 * r }, nil, "Glow")
+		end,
+	})
+
+	---------------------------------------------------------------- mouths
+	R.register({
+		id = "SlitMouth",
+		slots = MOUTH,
+		grade = "Grade4",
+		tags = { "mouth" },
+		params = { width = 0.5, socket = "Mouth" },
+		build = function(ctx, p)
+			local at, w = A.at(ctx), p.width
+			ctx:blob(at, { 0, 0, 0 }, { w * 1.15, 0.14, 0.17 }, nil, "SkinDark")
+			ctx:blob(at, { 0, 0.04, 0 }, { w, 0.1, 0.06 }, nil, "Void")
+			for i = 0, 5 do
+				local x = (i / 5 - 0.5) * w * 0.8
+				ctx:blob(at, { x, 0.07, 0.015 }, { 0.045, 0.04, 0.05 }, nil, "Teeth")
+			end
+		end,
+	})
+
+	R.register({
+		id = "GrinMouth",
+		slots = MOUTH,
+		grade = "Grade3",
+		tags = { "mouth", "teeth" },
+		params = { width = 0.85, teeth = 11, socket = "Mouth" },
+		build = function(ctx, p)
+			local at, w, n = A.at(ctx), p.width, p.teeth
+			local function curve(x)
+				return 0.14 * (2 * x / w) ^ 2
+			end
+			for i = 0, 6 do
+				local x = (i / 6 - 0.5) * w
+				ctx:blob(at, { x, 0, curve(x) }, { w / 5, 0.12, 0.22 }, nil, "Void")
+			end
+			for i = 0, n - 1 do
+				local x = (i / (n - 1) - 0.5) * w * 0.95
+				local z = curve(x)
+				ctx:capsule(at, { x, 0.05, z + 0.09 }, { x, 0.07, z - 0.01 }, 0.035, "Teeth")
+				ctx:capsule(at, { x + 0.03, 0.05, z - 0.09 }, { x + 0.03, 0.07, z + 0.0 }, 0.032, "Teeth")
+			end
+			ctx:tube(at, { { -w * 0.55, 0.0, curve(w * 0.55) }, { 0, 0.02, 0.13 }, { w * 0.55, 0.0, curve(w * 0.55) } },
+				{ 0.05, 0.06, 0.05 }, "SkinDark")
+		end,
+	})
+
+	R.register({
+		id = "Maw",
+		slots = MOUTH,
+		grade = "Grade2",
+		tags = { "mouth", "teeth" },
+		params = { size = 0.55, teeth = 14, socket = "Chest" },
+		build = function(ctx, p)
+			local at, s = A.at(ctx), p.size
+			ctx:blob(at, { 0, -0.05, 0 }, { 1.7 * s, 0.45 * s, 2.2 * s }, nil, "SkinDark")
+			ctx:blob(at, { 0, 0.05, 0 }, { 1.35 * s, 0.4 * s, 1.85 * s }, nil, "Void")
+			for i = 1, p.teeth do
+				local a = i / p.teeth * math.pi * 2
+				local ox, oz = math.cos(a) * 0.68 * s, math.sin(a) * 0.92 * s
+				ctx:capsule(at, { ox, 0.15 * s, oz }, { ox * 0.62, 0.2 * s, oz * 0.62 }, 0.05 * s / 0.55, "Teeth")
+			end
+		end,
+	})
+
+	R.register({
+		id = "LampreyMouth",
+		slots = MOUTH,
+		grade = "Grade2",
+		tags = { "mouth", "teeth" },
+		params = { size = 0.45, socket = "Mouth" },
+		build = function(ctx, p)
+			local at, s = A.at(ctx), p.size
+			ctx:blob(at, { 0, -0.05, 0 }, { 2 * s, 0.6 * s, 2 * s }, nil, "SkinDark")
+			ctx:blob(at, { 0, 0.08, 0 }, { 1.6 * s, 0.5 * s, 1.6 * s }, nil, "Void")
+			for ring, rr in ipairs({ 0.72, 0.5, 0.3 }) do
+				local n = 14 - ring * 3
+				for i = 1, n do
+					local a = (i + ring * 0.5) / n * math.pi * 2
+					ctx:capsule(at, { math.cos(a) * rr * s, 0.18 * s, math.sin(a) * rr * s },
+						{ math.cos(a) * (rr - 0.16) * s, 0.24 * s, math.sin(a) * (rr - 0.16) * s }, 0.035, "Teeth")
+				end
+			end
+		end,
+	})
+
+	R.register({
+		id = "Mandibles",
+		slots = MOUTH,
+		grade = "Grade3",
+		tags = { "mouth", "insect" },
+		params = { length = 0.7, socket = "Mouth" },
+		build = function(ctx, p)
+			local at, L = A.at(ctx), p.length
+			ctx:blob(at, { 0, 0, 0 }, { 0.35, 0.15, 0.2 }, nil, "Void")
+			for _, s in ipairs({ 1, -1 }) do
+				local pts = { { 0.18 * s, 0, 0 }, { 0.42 * s, 0.35 * L, -0.12 * L }, { 0.38 * s, 0.75 * L, -0.35 * L },
+					{ 0.1 * s, 0.95 * L, -0.5 * L } }
+				ctx:tube(at, pts, { 0.1, 0.08, 0.06, 0.02 }, function(i)
+					return i == 3 and "Claw" or "SkinDark"
+				end)
+				for k = 1, 3 do
+					local q = A.lerp(pts[2], pts[3], k / 4)
+					ctx:capsule(at, q, { q[1] - 0.1 * s, q[2] + 0.02, q[3] }, 0.025, "Teeth")
+				end
+			end
+		end,
+	})
+
+	R.register({
+		id = "TongueMouth",
+		slots = MOUTH,
+		grade = "Grade2",
+		tags = { "mouth", "tendril" },
+		params = { width = 0.5, length = 1.2, socket = "Mouth" },
+		build = function(ctx, p)
+			local at = A.at(ctx)
+			ctx:blob(at, { 0, 0, 0 }, { p.width * 1.2, 0.2, 0.3 }, nil, "SkinDark")
+			ctx:blob(at, { 0, 0.05, 0 }, { p.width, 0.15, 0.2 }, nil, "Void")
+			local seg = p.length / 4
+			ctx:chain(at, { 0, 0.05, 0 }, { 110, 0, 0 }, {
+				{ seg, 0.09, { 0, 0, 0 } }, { seg, 0.08, { 12, 0, 0 } }, { seg, 0.07, { 12, 0, 5 } }, { seg, 0.05, { 10, 0, 5 } },
+			}, { name = "Tongue", role = "Flesh", sway = { amp = 10, speed = 1.4 } })
+		end,
+	})
+
+	R.register({
+		id = "HangingJaw",
+		slots = MOUTH,
+		grade = "Grade2",
+		tags = { "mouth", "jaw" },
+		params = { width = 0.7, socket = "Jaw" },
+		build = function(ctx, p)
+			local at, w = A.at(ctx), p.width
+			ctx:blob(at, { 0, 0.25, 0.1 }, { w, 0.5, 0.7 }, nil, "SkinDark")
+			ctx:blob(at, { 0, 0.35, -0.2 }, { w * 0.8, 0.35, 0.3 }, nil, "Void")
+			for i = 0, 6 do
+				local x = (i / 6 - 0.5) * w * 0.8
+				ctx:capsule(at, { x, 0.35, -0.35 }, { x, 0.12, -0.42 }, 0.035, "Teeth")
+			end
+		end,
+	})
+
+	---------------------------------------------------------------- head growths
+	R.register({
+		id = "ExtraEar",
+		slots = GROWTH,
+		grade = "Grade4",
+		tags = { "growth" },
+		params = { size = 1, socket = "TempleR" },
+		build = function(ctx, p)
+			local at, s = A.at(ctx), p.size
+			ctx:blob(at, { 0, 0.05, 0 }, { 0.3 * s, 0.14 * s, 0.45 * s }, nil, "SkinDark")
+			ctx:blob(at, { 0, 0.1, 0 }, { 0.18 * s, 0.08 * s, 0.3 * s }, nil, "SkinDeep")
+		end,
+	})
+
+	R.register({
+		id = "ExtraNose",
+		slots = GROWTH,
+		grade = "Grade4",
+		tags = { "growth" },
+		params = { size = 1, socket = "CheekR" },
+		build = function(ctx, p)
+			local at, s = A.at(ctx), p.size
+			ctx:capsule(at, { 0, 0, 0.12 * s }, { 0, 0.22 * s, -0.08 * s }, 0.1 * s, "SkinLight")
+			for _, x in ipairs({ -0.05, 0.05 }) do
+				ctx:blob(at, { x * s, 0.2 * s, -0.12 * s }, { 0.05 * s, 0.04 * s, 0.05 * s }, nil, "Void")
+			end
+		end,
+	})
+
+	R.register({
+		id = "BoneSpur",
+		slots = { "HeadGrowths", "Disfigurements", "TorsoGrowths" },
+		grade = "Grade4",
+		tags = { "bone" },
+		params = { length = 0.45, thickness = 0.09, socket = "BackOfHead" },
+		build = function(ctx, p)
+			local at, L, r = A.at(ctx), p.length, p.thickness
+			ctx:blob(at, { 0, 0, 0 }, { r * 3, r * 1.4, r * 3 }, nil, "SkinDark")
+			ctx:tube(at, { { 0, 0, 0 }, { 0.02, L * 0.5, 0.03 }, { 0.06, L, 0.08 } }, { r, r * 0.6, r * 0.1 }, "Bone")
+		end,
+	})
+
+	R.register({
+		id = "FacePlate",
+		slots = GROWTH,
+		grade = "Grade3",
+		tags = { "bone", "armor" },
+		params = { size = 1, socket = "Brow" },
+		build = function(ctx, p)
+			local at, s = A.at(ctx), p.size
+			ctx:blob(at, { 0, 0.02, 0 }, { 0.9 * s, 0.14 * s, 0.7 * s }, nil, "Bone")
+			ctx:blob(at, { 0, 0.0, -0.3 * s }, { 0.95 * s, 0.1 * s, 0.2 * s }, nil, "BoneDark")
+		end,
+	})
+
+	R.register({
+		id = "Tumor",
+		slots = { "HeadGrowths", "Disfigurements", "TorsoGrowths", "Back" },
+		grade = "Grade4",
+		tags = { "growth", "flesh" },
+		params = { size = 0.35, lumps = 4, socket = "TempleR" },
+		build = function(ctx, p)
+			local at = A.at(ctx)
+			local roles = { "SkinLight", "Flesh", "SkinDark", "Skin" }
+			for i = 1, p.lumps do
+				local r = p.size * ctx:rand(0.45, 1)
+				ctx:blob(at, { ctx:rand(-1, 1) * p.size * 0.6, r * 0.2, ctx:rand(-1, 1) * p.size * 0.6 },
+					{ r, r * ctx:rand(0.6, 0.9), r * ctx:rand(0.8, 1.1) }, { 0, ctx:rand(0, 180), 0 },
+					roles[(i - 1) % #roles + 1])
+			end
+		end,
+	})
+
+	R.register({
+		id = "Crest",
+		slots = GROWTH,
+		grade = "Grade3",
+		tags = { "bone", "spine" },
+		params = { spines = 5, height = 0.45, socket = "Crown" },
+		build = function(ctx, p)
+			local at = A.at(ctx)
+			for i = 1, p.spines do
+				local z = (i - 1) * 0.2 - 0.15
+				local h = p.height * (1 - (i - 1) / (p.spines + 1))
+				ctx:tube(at, { { 0, -0.05, z }, { 0, h * 0.6, z + 0.08 }, { 0, h, z + 0.2 } }, { 0.07, 0.04, 0.01 }, "BoneDark")
+			end
+			ctx:triangle(at, { 0, 0, -0.15 }, { 0, p.height, 0.05 }, { 0, 0, (p.spines - 1) * 0.2 + 0.1 }, "Membrane", 0.03)
+		end,
+	})
+
+	R.register({
+		id = "Antennae",
+		slots = GROWTH,
+		grade = "Grade3",
+		tags = { "insect", "tendril" },
+		params = { length = 1.2, socket = "Brow" },
+		build = function(ctx, p)
+			local at = A.at(ctx)
+			local seg = p.length / 4
+			for _, s in ipairs({ 1, -1 }) do
+				ctx:chain(at, { 0.15 * s, 0, 0 }, { 150, 0, 25 * s }, {
+					{ seg, 0.04, { 0, 0, 0 } }, { seg, 0.035, { -15, 0, 0 } }, { seg, 0.03, { -15, 0, 0 } }, { seg, 0.02, { -10, 0, 0 } },
+				}, { name = "Antenna", role = "SkinDark", sway = { amp = 8, speed = 1.3 } })
+			end
+		end,
+	})
+
+	R.register({
+		id = "FaceDistortion",
+		slots = GROWTH,
+		grade = "Grade3",
+		tags = { "deformed", "flesh" },
+		params = { size = 0.4, socket = "CheekR" },
+		build = function(ctx, p)
+			local at, s = A.at(ctx), p.size
+			ctx:blob(at, { 0, 0, -0.3 * s }, { 0.9 * s, 0.45 * s, 1.4 * s }, { 10, 0, 0 }, "SkinDark")
+			ctx:blob(at, { 0.1 * s, 0.05, -0.8 * s }, { 0.6 * s, 0.35 * s, 0.8 * s }, nil, "Skin")
+			ctx:blob(at, { -0.15 * s, 0.1, -1.1 * s }, { 0.35 * s, 0.25 * s, 0.4 * s }, nil, "SkinLight")
+		end,
+	})
+
+	R.register({
+		id = "HeadGrowth",
+		slots = GROWTH,
+		grade = "Grade3",
+		tags = { "growth", "flesh" },
+		params = { size = 0.8, socket = "Crown" },
+		build = function(ctx, p)
+			local at, s = A.at(ctx), p.size
+			ctx:blob(at, { 0, 0.15 * s, 0 }, { 1.1 * s, 0.8 * s, 1.0 * s }, nil, "SkinLight")
+			ctx:blob(at, { 0.2 * s, 0.35 * s, 0.1 * s }, { 0.6 * s, 0.5 * s, 0.55 * s }, nil, "Flesh")
+			for i = 1, 3 do
+				local a = i * 2.1
+				ctx:capsule(at, { math.cos(a) * 0.5 * s, 0.1 * s, math.sin(a) * 0.45 * s },
+					{ math.cos(a) * 0.15 * s, 0.5 * s, math.sin(a) * 0.1 * s }, 0.035, "SkinDeep")
+			end
+		end,
+	})
+end
+]]></ProtectedString></Properties></Item><Item class="ModuleScript" referent="RBX5"><Properties><string name="Name">Heads</string><ProtectedString name="Source"><![CDATA[--!nonstrict
+-- Base heads. Each defines the head sockets on its own skull/face (so horns, eyes and
+-- mouths land on the real surface) and default features used when the appearance
+-- leaves Eyes / Mouths / HeadGrowths unset.
+
+local A = require(script.Parent._Anatomy)
+
+local function facing(yaw)
+	return { -90, 0, -(yaw or 0) } -- front, turned `yaw` degrees toward the right
+end
+
+--[[
+	Define the standard head sockets from a compact table (right side; left mirrored).
+	s = { crown=, top=, topTilt=, brow=, face=, eye=, eyeYaw=, mouth=, jaw=, cheek=, temple=, ear=, back= }
+]]
+local function headSockets(ctx, head, s)
+	ctx:defineSocket("Crown", head, s.crown, s.crownRot or A.UP)
+	ctx:defineSocketPair("Top", head, s.top, { s.topTiltX or 0, 0, -(s.topTilt or 30) })
+	ctx:defineSocket("Brow", head, s.brow, s.browRot or { -60, 0, 0 })
+	ctx:defineSocket("Face", head, s.face, A.FRONT)
+	ctx:defineSocketPair("Eye", head, s.eye, facing(s.eyeYaw or 0))
+	ctx:defineSocket("Mouth", head, s.mouth, A.FRONT)
+	ctx:defineSocket("Jaw", head, s.jaw, A.DOWN)
+	ctx:defineSocketPair("Cheek", head, s.cheek, facing(45))
+	ctx:defineSocketPair("Temple", head, s.temple, A.RIGHT)
+	ctx:defineSocketPair("Ear", head, s.ear, A.RIGHT)
+	ctx:defineSocket("BackOfHead", head, s.back, A.BACK)
+end
+
+local function withHead(ctx, entry, fn)
+	local part = entry.part or ctx:basePart("Head")
+	local head = ctx:anchor(part)
+	ctx:with({ scale = ctx.scale * ctx:m("Head") }, fn, head)
+end
+
+local PAIR_EYES = { { id = "Eye", socket = "EyeR" }, { id = "Eye", socket = "EyeL" } }
+
+return function(R)
+	local function headDef(def)
+		def.slots = { "Head" }
+		local build = def.build
+		def.build = function(ctx, params, entry)
+			withHead(ctx, entry, function(head)
+				build(ctx, params, head)
+			end)
+		end
+		R.register(def)
+	end
+
+	headDef({
+		id = "HumanCurseHead",
+		grade = "Grade4",
+		tags = { "humanoid" },
+		defaults = { Eyes = PAIR_EYES, Mouths = { { id = "SlitMouth", socket = "Mouth" } } },
+		build = function(ctx, params, head)
+			ctx:blob(head, { 0, 0.15, 0.05 }, { 1.25, 1.35, 1.35 }, nil, "Skin")
+			ctx:blob(head, { 0, 0.25, -0.5 }, { 1.05, 0.25, 0.4 }, { -10, 0, 0 }, "SkinLight")
+			ctx:blob(head, { 0, -0.38, -0.2 }, { 0.95, 0.55, 0.95 }, nil, "Skin")
+			ctx:blob(head, { 0, -0.55, -0.5 }, { 0.4, 0.25, 0.25 }, nil, "SkinLight")
+			ctx:blob(head, { 0, 0.02, -0.66 }, { 0.18, 0.3, 0.2 }, { -15, 0, 0 }, "SkinLight")
+			for _, s in ipairs({ 1, -1 }) do
+				ctx:blob(head, { 0.38 * s, -0.02, -0.45 }, { 0.35, 0.25, 0.3 }, nil, "SkinLight")
+				ctx:blob(head, { 0.64 * s, 0.02, 0.05 }, { 0.12, 0.35, 0.25 }, nil, "SkinDark")
+			end
+			-- a curse is never quite symmetrical
+			local lx = ctx:rand(-0.4, 0.4)
+			ctx:blob(head, { lx, 0.62, ctx:rand(-0.2, 0.3) }, { 0.45, 0.25, 0.4 }, nil, "SkinLight")
+			headSockets(ctx, head, {
+				crown = { 0, 0.82, 0.05 }, top = { 0.35, 0.7, 0 }, brow = { 0, 0.4, -0.58 }, face = { 0, 0.05, -0.68 },
+				eye = { 0.25, 0.12, -0.58 }, mouth = { 0, -0.3, -0.6 }, jaw = { 0, -0.62, -0.25 },
+				cheek = { 0.5, -0.12, -0.35 }, temple = { 0.6, 0.3, -0.05 }, ear = { 0.66, 0, 0.05 },
+				back = { 0, 0.25, 0.68 },
+			})
+		end,
+	})
+
+	headDef({
+		id = "AnimalHead",
+		grade = "Grade4",
+		tags = { "beast" },
+		defaults = {
+			Eyes = { { id = "Eye", socket = "EyeR" }, { id = "Eye", socket = "EyeL" } },
+			Mouths = { { id = "GrinMouth", socket = "Mouth", scale = 0.8 } },
+		},
+		build = function(ctx, params, head)
+			ctx:blob(head, { 0, 0.2, 0.2 }, { 1.1, 1.05, 1.2 }, nil, "Skin")
+			ctx:capsule(head, { 0, -0.02, -0.15 }, { 0, -0.2, -1.05 }, { 0.38, 0.3 }, "Skin")
+			ctx:capsule(head, { 0, -0.3, -0.2 }, { 0, -0.42, -0.95 }, { 0.3, 0.22 }, "SkinDark")
+			ctx:blob(head, { 0, -0.1, -1.12 }, { 0.36, 0.24, 0.22 }, nil, "SkinDeep")
+			ctx:blob(head, { 0, 0.22, -0.45 }, { 0.8, 0.3, 0.6 }, { -20, 0, 0 }, "SkinLight")
+			for _, s in ipairs({ 1, -1 }) do
+				ctx:tube(head, { { 0.33 * s, 0.6, 0.25 }, { 0.45 * s, 0.9, 0.32 }, { 0.52 * s, 1.15, 0.42 } },
+					{ 0.16, 0.1, 0.03 }, "SkinDark")
+			end
+			headSockets(ctx, head, {
+				crown = { 0, 0.75, 0.2 }, top = { 0.3, 0.65, 0.1 }, topTilt = 25, brow = { 0, 0.45, -0.3 },
+				face = { 0, 0.05, -0.9 }, eye = { 0.33, 0.28, -0.32 }, eyeYaw = 30, mouth = { 0, -0.32, -0.95 },
+				jaw = { 0, -0.55, -0.6 }, cheek = { 0.4, -0.05, -0.4 }, temple = { 0.55, 0.3, 0.15 },
+				ear = { 0.55, 0.35, 0.3 }, back = { 0, 0.3, 0.8 },
+			})
+		end,
+	})
+
+	headDef({
+		id = "OversizedHead",
+		grade = "Grade3",
+		tags = { "abnormal" },
+		defaults = { Eyes = PAIR_EYES, Mouths = { { id = "SlitMouth", socket = "Mouth", scale = 0.7 } } },
+		build = function(ctx, params, head)
+			ctx:blob(head, { 0, 0.6, 0.15 }, { 1.95, 1.95, 2.05 }, nil, "Skin")
+			for i = 1, 4 do
+				local a = i * 1.7
+				ctx:blob(head, { math.cos(a) * 0.6, 1.0 + math.sin(a) * 0.3, 0.2 + math.sin(a * 2) * 0.4 },
+					{ 0.8, 0.6, 0.8 }, nil, "SkinLight")
+			end
+			ctx:blob(head, { 0, -0.25, -0.62 }, { 0.9, 0.7, 0.6 }, nil, "Skin")
+			ctx:blob(head, { 0, -0.5, -0.45 }, { 0.6, 0.4, 0.5 }, nil, "SkinDark")
+			headSockets(ctx, head, {
+				crown = { 0, 1.55, 0.15 }, top = { 0.6, 1.3, 0.1 }, topTilt = 35, brow = { 0, 0.3, -0.85 },
+				face = { 0, -0.1, -0.9 }, eye = { 0.22, 0.02, -0.88 }, mouth = { 0, -0.4, -0.88 },
+				jaw = { 0, -0.7, -0.4 }, cheek = { 0.45, -0.2, -0.6 }, temple = { 0.95, 0.6, 0 },
+				ear = { 0.98, 0.3, 0.1 }, back = { 0, 0.7, 1.15 },
+			})
+		end,
+	})
+
+	headDef({
+		id = "SmallHead",
+		grade = "Grade4",
+		tags = { "abnormal" },
+		defaults = { Eyes = PAIR_EYES, Mouths = { { id = "SlitMouth", socket = "Mouth", scale = 0.6 } } },
+		build = function(ctx, params, head)
+			ctx:blob(head, { 0, -0.05, -0.1 }, { 0.75, 0.8, 0.8 }, nil, "Skin")
+			ctx:blob(head, { 0, -0.3, -0.25 }, { 0.55, 0.35, 0.55 }, nil, "SkinDark")
+			headSockets(ctx, head, {
+				crown = { 0, 0.33, -0.1 }, top = { 0.2, 0.28, -0.1 }, brow = { 0, 0.15, -0.42 },
+				face = { 0, -0.05, -0.5 }, eye = { 0.15, 0.03, -0.46 }, mouth = { 0, -0.22, -0.46 },
+				jaw = { 0, -0.45, -0.2 }, cheek = { 0.3, -0.12, -0.35 }, temple = { 0.37, 0.05, -0.1 },
+				ear = { 0.38, -0.05, -0.05 }, back = { 0, 0.02, 0.3 },
+			})
+		end,
+	})
+
+	headDef({
+		id = "FacelessHead",
+		grade = "Grade4",
+		tags = { "faceless" },
+		defaults = { Eyes = {}, Mouths = {} },
+		build = function(ctx, params, head)
+			ctx:blob(head, { 0, 0.15, 0 }, { 1.2, 1.5, 1.3 }, nil, "Skin")
+			ctx:blob(head, { 0, 0.02, -0.52 }, { 0.95, 0.95, 0.3 }, nil, "SkinLight")
+			headSockets(ctx, head, {
+				crown = { 0, 0.9, 0 }, top = { 0.33, 0.78, 0 }, brow = { 0, 0.45, -0.55 }, face = { 0, 0.05, -0.68 },
+				eye = { 0.25, 0.15, -0.64 }, mouth = { 0, -0.25, -0.64 }, jaw = { 0, -0.6, -0.15 },
+				cheek = { 0.45, -0.1, -0.4 }, temple = { 0.58, 0.3, 0 }, ear = { 0.6, 0.05, 0.05 },
+				back = { 0, 0.3, 0.65 },
+			})
+		end,
+	})
+
+	-- The reference creature's head: bulbous crown, folds, speckles, hanging face tendrils.
+	headDef({
+		id = "OctopoidHead",
+		grade = "Grade2",
+		tags = { "reference", "tentacle" },
+		params = { tendrils = 5 },
+		defaults = {
+			Eyes = {
+				{ id = "Eye", socket = "EyeR", params = { size = 0.2, lid = false } },
+				{ id = "Eye", socket = "EyeL", params = { size = 0.2, lid = false } },
+			},
+			Mouths = {},
+		},
+		build = function(ctx, params, head)
+			ctx:blob(head, { 0, 0.40, 0.30 }, { 1.95, 1.75, 2.35 }, { 38, 0, 0 }, "Skin")
+			ctx:blob(head, { 0.05, 0.85, 0.75 }, { 1.55, 1.15, 1.45 }, { 25, 0, 6 }, "SkinLight")
+			ctx:blob(head, { 0, -0.10, -0.50 }, { 1.65, 1.25, 1.15 }, { -12, 0, 0 }, "Skin")
+			ctx:blob(head, { 0, -0.35, -0.85 }, { 1.20, 0.80, 0.70 }, { -25, 0, 0 }, "SkinLight")
+			ctx:blob(head, { 0.05, 0.30, -0.72 }, { 1.50, 0.38, 0.62 }, { -30, 0, 4 }, "Skin")
+			ctx:blob(head, { 0.05, 0.50, -0.55 }, { 1.10, 0.12, 0.40 }, { -30, 0, 4 }, "SkinDark")
+			ctx:blob(head, { 0.82, 0.40, 0.15 }, { 0.34, 0.30, 1.50 }, { 38, 0, -10 }, "SkinLight")
+			ctx:blob(head, { 0.78, 0.00, 0.10 }, { 0.30, 0.22, 1.30 }, { 30, 0, -18 }, "SkinDark")
+			ctx:blob(head, { -0.84, 0.48, 0.25 }, { 0.34, 0.32, 1.60 }, { 40, 0, 12 }, "SkinLight")
+			ctx:blob(head, { -0.80, 0.05, 0.05 }, { 0.30, 0.22, 1.20 }, { 28, 0, 20 }, "SkinDark")
+			ctx:blob(head, { 0, 1.15, 0.45 }, { 1.10, 0.22, 0.70 }, { 35, 0, 0 }, "SkinDark")
+			for _, spot in ipairs({
+				{ 0.25, 1.22, 0.05, 0.26 }, { -0.15, 1.30, 0.35, 0.3 }, { 0.5, 1.02, 0.45, 0.2 },
+				{ -0.42, 1.10, -0.02, 0.18 }, { 0.05, 1.05, -0.28, 0.16 }, { 0.35, 1.32, 0.55, 0.14 },
+			}) do
+				ctx:blob(head, { spot[1], spot[2], spot[3] }, { spot[4], spot[4] * 0.45, spot[4] }, { 30, 0, 0 }, "Spot")
+			end
+			for _, s in ipairs({ 1, -1 }) do
+				ctx:blob(head, { 0.70 * s, 0.05, -0.62 }, { 0.40, 0.36, 0.30 }, { 0, -50 * s, 0 }, "SkinDeep")
+			end
+			local n = math.max(1, params.tendrils)
+			for i = 1, n do
+				local t = n == 1 and 0 or (i - 1) / (n - 1) * 2 - 1
+				local len = 0.75 - math.abs(t) * 0.22
+				ctx:chain(head, { t * 0.42, -0.62, -0.9 }, { -8, 0, -t * 10 }, {
+					{ len * 0.55, 0.15, { 0, 0, 0 } },
+					{ len * 0.55, 0.11, { -4, 0, -t * 8 } },
+				}, { name = "FaceTendril", sway = { amp = 5, speed = 1.1 }, role = i % 2 == 0 and "SkinLight" or "Skin" })
+			end
+			headSockets(ctx, head, {
+				crown = { 0, 1.3, 0.3 }, crownRot = { 30, 0, 0 }, top = { 0.55, 1.1, 0.2 }, topTiltX = 20,
+				brow = { 0, 0.5, -0.65 }, browRot = { -50, 0, 0 }, face = { 0, -0.1, -1.0 },
+				eye = { 0.76, 0.05, -0.68 }, eyeYaw = 50, mouth = { 0, -0.55, -0.95 }, jaw = { 0, -0.8, -0.7 },
+				cheek = { 0.6, -0.3, -0.6 }, temple = { 0.9, 0.4, 0.2 }, ear = { 0.9, 0.1, 0.2 },
+				back = { 0, 0.9, 1.2 },
+			})
+		end,
+	})
+
+	headDef({
+		id = "SplitJawHead",
+		grade = "Grade2",
+		tags = { "maw", "transformation" },
+		defaults = {
+			Eyes = { { id = "EyeCluster", socket = "Crown", params = { count = 4, spread = 0.35 } } },
+			Mouths = {},
+		},
+		build = function(ctx, params, head)
+			ctx:blob(head, { 0, 0.4, 0.15 }, { 1.3, 0.95, 1.35 }, nil, "Skin")
+			ctx:blob(head, { 0, -0.35, -0.15 }, { 0.85, 1.25, 1.0 }, nil, "Void")
+			for _, s in ipairs({ 1, -1 }) do
+				ctx:blob(head, { 0.55 * s, -0.45, -0.15 }, { 0.62, 1.15, 1.15 }, { 0, 0, 28 * s }, "Skin")
+				ctx:blob(head, { 0.38 * s, -0.4, -0.55 }, { 0.2, 1.0, 0.25 }, { 0, 0, 28 * s }, "SkinDeep")
+				for k = 0, 5 do
+					local y = 0.05 - k * 0.2
+					local x = (0.3 + k * 0.1) * s
+					ctx:capsule(head, { x, y, -0.55 }, { x - 0.2 * s, y - 0.06, -0.6 }, 0.05, "Teeth")
+				end
+			end
+			for k = 0, 4 do
+				ctx:capsule(head, { -0.24 + k * 0.12, 0.02, -0.55 }, { -0.24 + k * 0.12, -0.2, -0.62 }, 0.05, "Teeth")
+			end
+			headSockets(ctx, head, {
+				crown = { 0, 0.85, 0.15 }, top = { 0.4, 0.75, 0.1 }, brow = { 0, 0.55, -0.5 }, face = { 0, 0.3, -0.6 },
+				eye = { 0.3, 0.45, -0.52 }, mouth = { 0, -0.4, -0.65 }, jaw = { 0, -1.0, -0.15 },
+				cheek = { 0.75, -0.2, -0.3 }, temple = { 0.65, 0.45, 0 }, ear = { 0.66, 0.3, 0.1 },
+				back = { 0, 0.4, 0.8 },
+			})
+		end,
+	})
+
+	headDef({
+		id = "ExtendedJawHead",
+		grade = "Grade3",
+		tags = { "jaw" },
+		defaults = { Eyes = PAIR_EYES, Mouths = {} },
+		build = function(ctx, params, head)
+			ctx:blob(head, { 0, 0.25, 0.05 }, { 1.2, 1.1, 1.25 }, nil, "Skin")
+			ctx:blob(head, { 0, -0.5, -0.4 }, { 0.65, 1.0, 0.45 }, { -15, 0, 0 }, "Void")
+			ctx:capsule(head, { 0, -0.25, -0.05 }, { 0, -1.35, -0.55 }, { 0.42, 0.32 }, "Skin")
+			ctx:blob(head, { 0, -1.45, -0.62 }, { 0.5, 0.3, 0.45 }, nil, "SkinLight")
+			for k = 0, 5 do
+				local x = -0.28 + k * 0.112
+				ctx:capsule(head, { x, -0.2, -0.55 }, { x, -0.5, -0.6 }, 0.045, "Teeth")
+				ctx:capsule(head, { x * 0.9, -1.2 + k % 2 * 0.05, -0.8 }, { x * 0.9, -0.85, -0.72 }, 0.045, "Teeth")
+			end
+			headSockets(ctx, head, {
+				crown = { 0, 0.8, 0.05 }, top = { 0.35, 0.72, 0 }, brow = { 0, 0.45, -0.55 }, face = { 0, 0.15, -0.63 },
+				eye = { 0.26, 0.28, -0.55 }, mouth = { 0, -0.6, -0.72 }, jaw = { 0, -1.6, -0.6 },
+				cheek = { 0.5, -0.05, -0.35 }, temple = { 0.6, 0.35, 0 }, ear = { 0.62, 0.1, 0.05 },
+				back = { 0, 0.3, 0.65 },
+			})
+		end,
+	})
+
+	headDef({
+		id = "MandibleHead",
+		grade = "Grade3",
+		tags = { "insect" },
+		defaults = {
+			Eyes = { { id = "CompoundEye", socket = "EyeR" }, { id = "CompoundEye", socket = "EyeL" } },
+			Mouths = { { id = "Mandibles", socket = "Mouth" } },
+		},
+		build = function(ctx, params, head)
+			ctx:capsule(head, { 0, 0.35, 0.4 }, { 0, -0.1, -0.55 }, { 0.55, 0.5 }, "SkinDark")
+			ctx:blob(head, { 0, 0.5, 0.05 }, { 1.0, 0.35, 1.15 }, { 10, 0, 0 }, "Skin")
+			ctx:blob(head, { 0, 0.25, -0.62 }, { 0.5, 0.3, 0.3 }, { -30, 0, 0 }, "Skin")
+			ctx:blob(head, { 0, -0.25, -0.62 }, { 0.45, 0.3, 0.35 }, nil, "SkinDeep")
+			headSockets(ctx, head, {
+				crown = { 0, 0.72, 0.1 }, top = { 0.3, 0.65, 0 }, brow = { 0, 0.45, -0.55 }, face = { 0, 0.1, -0.78 },
+				eye = { 0.42, 0.25, -0.3 }, eyeYaw = 60, mouth = { 0, -0.35, -0.75 }, jaw = { 0, -0.5, -0.4 },
+				cheek = { 0.45, -0.1, -0.45 }, temple = { 0.5, 0.35, 0.1 }, ear = { 0.5, 0.2, 0.25 },
+				back = { 0, 0.35, 0.85 },
+			})
+		end,
+	})
+
+	headDef({
+		id = "MaskedHead",
+		grade = "Grade3",
+		tags = { "mask", "bone" },
+		defaults = {
+			Eyes = {
+				{ id = "Eye", socket = "EyeR", params = { size = 0.12, role = "Glow", lid = false, ring = false } },
+				{ id = "Eye", socket = "EyeL", params = { size = 0.12, role = "Glow", lid = false, ring = false } },
+			},
+			Mouths = {},
+		},
+		build = function(ctx, params, head)
+			ctx:blob(head, { 0, 0.15, 0.1 }, { 1.25, 1.35, 1.3 }, nil, "SkinDark")
+			ctx:blob(head, { 0, 0.08, -0.55 }, { 1.2, 1.35, 0.3 }, { -5, 0, 0 }, "Bone")
+			ctx:blob(head, { 0, 0.55, -0.6 }, { 1.0, 0.25, 0.25 }, { -20, 0, 0 }, "Bone")
+			for _, s in ipairs({ 1, -1 }) do
+				ctx:blob(head, { 0.25 * s, 0.18, -0.68 }, { 0.3, 0.18, 0.1 }, { 0, 0, -10 * s }, "Void")
+			end
+			ctx:blob(head, { 0, -0.3, -0.68 }, { 0.5, 0.06, 0.08 }, nil, "Void")
+			ctx:capsule(head, { 0.15, 0.7, -0.58 }, { 0.05, 0.3, -0.7 }, 0.025, "BoneDark")
+			ctx:capsule(head, { 0.05, 0.3, -0.7 }, { 0.18, -0.1, -0.7 }, 0.025, "BoneDark")
+			headSockets(ctx, head, {
+				crown = { 0, 0.85, 0.1 }, top = { 0.36, 0.72, 0.05 }, brow = { 0, 0.5, -0.65 }, face = { 0, 0.05, -0.74 },
+				eye = { 0.25, 0.18, -0.66 }, mouth = { 0, -0.3, -0.7 }, jaw = { 0, -0.6, -0.2 },
+				cheek = { 0.5, -0.1, -0.4 }, temple = { 0.62, 0.3, 0.05 }, ear = { 0.64, 0.05, 0.1 },
+				back = { 0, 0.25, 0.72 },
+			})
+		end,
+	})
+
+	headDef({
+		id = "AsymmetricHead",
+		grade = "Grade3",
+		tags = { "deformed" },
+		defaults = {
+			Eyes = { { id = "Eye", socket = "EyeR", scale = 0.7 }, { id = "Eye", socket = "EyeL", scale = 1.6 } },
+			Mouths = { { id = "SlitMouth", socket = "Mouth", rot = { 0, 0, 14 } } },
+		},
+		build = function(ctx, params, head)
+			ctx:blob(head, { -0.05, 0.1, 0.05 }, { 1.2, 1.3, 1.3 }, nil, "Skin")
+			ctx:blob(head, { 0.45, 0.35, 0.05 }, { 0.95, 1.1, 1.05 }, { 0, 0, -10 }, "SkinLight")
+			ctx:blob(head, { -0.42, -0.38, -0.32 }, { 0.5, 0.55, 0.42 }, nil, "SkinDark")
+			ctx:blob(head, { 0.05, -0.42, -0.2 }, { 0.95, 0.5, 0.9 }, { 0, 0, 12 }, "Skin")
+			ctx:blob(head, { 0.6, 0.75, 0.1 }, { 0.4, 0.3, 0.45 }, nil, "SkinLight")
+			headSockets(ctx, head, {
+				crown = { 0.15, 0.85, 0.05 }, top = { 0.4, 0.8, 0 }, brow = { 0, 0.35, -0.58 }, face = { 0, 0, -0.66 },
+				eye = { 0.3, 0.18, -0.6 }, mouth = { -0.05, -0.32, -0.6 }, jaw = { 0, -0.62, -0.2 },
+				cheek = { 0.55, -0.1, -0.4 }, temple = { 0.85, 0.35, 0 }, ear = { 0.9, 0.1, 0.05 },
+				back = { 0, 0.3, 0.68 },
+			})
+		end,
+	})
+
+	headDef({
+		id = "SkullHead",
+		grade = "Grade2",
+		tags = { "bone" },
+		defaults = {
+			Eyes = {
+				{ id = "Eye", socket = "EyeR", params = { size = 0.09, role = "Glow", lid = false, ring = false } },
+				{ id = "Eye", socket = "EyeL", params = { size = 0.09, role = "Glow", lid = false, ring = false } },
+			},
+			Mouths = {},
+		},
+		build = function(ctx, params, head)
+			ctx:blob(head, { 0, 0.2, 0.05 }, { 1.15, 1.2, 1.25 }, nil, "Bone")
+			ctx:blob(head, { 0, -0.1, -0.35 }, { 0.95, 0.7, 0.7 }, nil, "Bone")
+			for _, s in ipairs({ 1, -1 }) do
+				ctx:blob(head, { 0.25 * s, 0.12, -0.55 }, { 0.32, 0.3, 0.2 }, nil, "Void")
+				ctx:blob(head, { 0.42 * s, -0.12, -0.38 }, { 0.3, 0.2, 0.35 }, nil, "BoneDark")
+			end
+			ctx:blob(head, { 0, -0.08, -0.66 }, { 0.14, 0.2, 0.1 }, nil, "Void")
+			ctx:blob(head, { 0, -0.52, -0.18 }, { 0.85, 0.32, 0.85 }, nil, "BoneDark")
+			for k = 0, 7 do
+				local x = -0.3 + k * 0.086
+				ctx:blob(head, { x, -0.34, -0.6 + math.abs(x) * 0.25 }, { 0.07, 0.16, 0.07 }, nil, "Teeth")
+				ctx:blob(head, { x * 0.95, -0.46, -0.56 + math.abs(x) * 0.25 }, { 0.07, 0.14, 0.07 }, nil, "Teeth")
+			end
+			headSockets(ctx, head, {
+				crown = { 0, 0.8, 0.05 }, top = { 0.35, 0.68, 0 }, brow = { 0, 0.4, -0.55 }, face = { 0, 0.05, -0.7 },
+				eye = { 0.25, 0.12, -0.54 }, mouth = { 0, -0.4, -0.64 }, jaw = { 0, -0.68, -0.2 },
+				cheek = { 0.48, -0.12, -0.35 }, temple = { 0.57, 0.3, 0 }, ear = { 0.58, 0.05, 0.05 },
+				back = { 0, 0.25, 0.66 },
+			})
+		end,
+	})
+
+	-- Special Grade: no head at all. Its face lives on the torso.
+	headDef({
+		id = "Headless",
+		grade = "SpecialGrade",
+		tags = { "abnormal" },
+		defaults = {
+			Eyes = { { id = "EyeCluster", socket = "Chest", params = { count = 6, spread = 0.55 } } },
+			Mouths = { { id = "Maw", socket = "Belly" } },
+		},
+		build = function(ctx, params, head)
+			ctx:blob(head, { 0, -0.45, 0 }, { 0.85, 0.35, 0.85 }, nil, "SkinDeep")
+			ctx:blob(head, { 0, -0.5, 0 }, { 1.0, 0.25, 1.0 }, nil, "SkinDark")
+			headSockets(ctx, head, {
+				crown = { 0, -0.3, 0 }, top = { 0.3, -0.35, 0 }, brow = { 0, -0.35, -0.35 }, face = { 0, -0.4, -0.45 },
+				eye = { 0.2, -0.35, -0.4 }, mouth = { 0, -0.45, -0.45 }, jaw = { 0, -0.55, 0 },
+				cheek = { 0.35, -0.4, -0.3 }, temple = { 0.45, -0.4, 0 }, ear = { 0.45, -0.45, 0 },
+				back = { 0, -0.4, 0.45 },
+			})
+		end,
+	})
+end
+]]></ProtectedString></Properties></Item><Item class="ModuleScript" referent="RBX6"><Properties><string name="Name">Horns</string><ProtectedString name="Source"><![CDATA[--!nonstrict
+--[[
+	Horn / head-growth system. One procedural builder sweeps a tapered, ridged tube along
+	a bending, optionally spiralling path out of a skull socket; every registered horn is
+	a parameter set, and horn SETS place several horns on skull sockets.
+
+	params
+	  length thickness taper   size and tip radius (fraction of base)
+	  curve                    total bend in degrees
+	  curveDir {x, z}          initial bend direction in the socket plane (x = outward, z = back)
+	  spiral                   degrees the bend direction twists around the horn (ram curls)
+	  tilt {rx, rz}            initial lean of the horn out of the socket
+	  segments                 smoothness
+	  broken                   0..1 fraction snapped off (jagged end)
+	  branches                 antler tines
+	  ridges                   growth rings
+	  role rootRole tipRole    palette roles (root = skin the horn erupts from)
+	  mesh                     optional MeshId: use custom art instead of the procedural tube
+	Every horn starts with a root blob in the SKIN role sunk into the socket, so it grows
+	out of the head rather than sitting on it like an accessory.
+]]
+
+local A = require(script.Parent._Anatomy)
+
+local function norm(v)
+	local m = math.sqrt(v[1] ^ 2 + v[2] ^ 2 + v[3] ^ 2)
+	return m > 0 and { v[1] / m, v[2] / m, v[3] / m } or { 0, 1, 0 }
+end
+local function cross(a, b)
+	return { a[2] * b[3] - a[3] * b[2], a[3] * b[1] - a[1] * b[3], a[1] * b[2] - a[2] * b[1] }
+end
+local function sub(a, b)
+	return { a[1] - b[1], a[2] - b[2], a[3] - b[3] }
+end
+local function dot(a, b)
+	return a[1] * b[1] + a[2] * b[2] + a[3] * b[3]
+end
+-- rotate v around unit axis k by angle a (Rodrigues)
+local function rotate(v, k, a)
+	local c, s = math.cos(a), math.sin(a)
+	local kxv, kdv = cross(k, v), dot(k, v)
+	return {
+		v[1] * c + kxv[1] * s + k[1] * kdv * (1 - c),
+		v[2] * c + kxv[2] * s + k[2] * kdv * (1 - c),
+		v[3] * c + kxv[3] * s + k[3] * kdv * (1 - c),
+	}
+end
+
+-- sweep a horn path: returns points, radii, final direction
+local function sweep(start, dir, bend, length, r0, taper, curve, spiral, n)
+	local pts, radii = { start }, { r0 }
+	local step = length / n
+	local pos = start
+	local a, sp = math.rad(curve / n), math.rad(spiral / n)
+	for i = 1, n do
+		-- bend: rotate dir toward the bend vector around their common normal
+		local axis = cross(dir, bend)
+		if math.sqrt(dot(axis, axis)) > 1e-5 then
+			axis = norm(axis)
+			dir = norm(rotate(dir, axis, a))
+			bend = norm(rotate(bend, axis, a))
+		end
+		if sp ~= 0 then
+			bend = norm(rotate(bend, dir, sp))
+		end
+		pos = A.add(pos, dir, step)
+		table.insert(pts, pos)
+		table.insert(radii, r0 * (1 + (taper - 1) * (i / n) ^ 0.8))
+	end
+	return pts, radii, dir
+end
+
+local function buildHorn(ctx, p, at)
+	at = at or A.at(ctx)
+	local r0, L = p.thickness, p.length
+	local tilt = p.tilt or { 0, 0 }
+	ctx:blob(at, { 0, -0.04, 0 }, { r0 * 3.4, r0 * 1.8, r0 * 3.4 }, nil, p.rootRole or "Skin")
+	if p.mesh then
+		ctx:mesh(at, { 0, L / 2, 0 }, { r0 * 2, L, r0 * 2 }, { tilt[1], 0, tilt[2] }, p.mesh, p.role or "Bone")
+		return
+	end
+	local dir = norm(A.rot({ 0, 1, 0 }, tilt[1], tilt[2]))
+	local cd = p.curveDir or { 0, 1 }
+	local bend = norm({ cd[1], 0, cd[2] })
+	-- keep bend perpendicular to the initial direction
+	local d = dot(bend, dir)
+	bend = norm({ bend[1] - dir[1] * d, bend[2] - dir[2] * d, bend[3] - dir[3] * d })
+	local n = p.segments or 6
+	local pts, radii = sweep({ 0, -0.02, 0 }, dir, bend, L, r0, p.taper or 0.15, p.curve or 0, p.spiral or 0, n)
+
+	local keep = n + 1
+	if (p.broken or 0) > 0 then
+		keep = math.max(2, math.floor((n + 1) * (1 - p.broken)))
+	end
+	local mainPts, mainRadii = {}, {}
+	for i = 1, keep do
+		mainPts[i], mainRadii[i] = pts[i], radii[i]
+	end
+	ctx:tube(at, mainPts, mainRadii, function(i, total)
+		if p.tipRole and i == total and keep == n + 1 then
+			return p.tipRole
+		end
+		return i <= math.max(1, math.floor(total * 0.25)) and (p.baseRole or "BoneDark") or (p.role or "Bone")
+	end)
+	if p.ridges then
+		for i = 2, keep - 1, 2 do
+			local a, b = pts[i], pts[i + 1] or pts[i]
+			local mid = A.lerp(a, b, 0.05)
+			ctx:capsule(at, mid, A.lerp(a, b, 0.2), mainRadii[i] * 1.12, p.baseRole or "BoneDark", { stretch = 1 })
+		end
+	end
+	if keep < n + 1 then
+		-- snapped end: a few jagged shards
+		local tip, r = pts[keep], radii[keep]
+		for k = 1, 3 do
+			local off = { math.cos(k * 2.1) * r * 0.5, 0, math.sin(k * 2.1) * r * 0.5 }
+			ctx:capsule(at, A.add(tip, off), A.add(A.add(tip, off), { 0, r * (0.6 + k * 0.25), 0 }), r * 0.35, "BoneDark")
+		end
+	end
+	for t = 1, (p.branches or 0) do
+		local idx = math.clamp(math.floor(n * (0.3 + 0.5 * t / (p.branches + 0.5))), 2, keep)
+		local origin = pts[idx]
+		local bdir = norm(A.add(norm(sub(pts[idx], pts[idx - 1])), { 0, 0, (t % 2 == 0) and 0.9 or -0.9 }))
+		local bpts, bradii = sweep(origin, bdir, { 0, 1, 0 }, L * 0.38, radii[idx] * 0.7, 0.2, 25, 0, 3)
+		ctx:tube(at, bpts, bradii, p.role or "Bone")
+	end
+end
+
+return function(R)
+	R.register({
+		id = "Horn",
+		slots = { "Horns", "HeadGrowths", "Disfigurements" },
+		grade = "Grade4",
+		tags = { "horn", "bone" },
+		params = {
+			socket = "Crown", length = 0.9, thickness = 0.12, taper = 0.12, curve = 40, curveDir = { 0, 1 },
+			spiral = 0, tilt = { 0, 0 }, segments = 6, broken = 0, branches = 0, ridges = true,
+			role = "Bone", baseRole = "BoneDark", rootRole = "Skin",
+		},
+		build = function(ctx, p)
+			buildHorn(ctx, p)
+		end,
+	})
+
+	local function horn(id, grade, params)
+		R.variant("Horn", { id = id, grade = grade, params = params, slots = { "Horns", "HeadGrowths", "Disfigurements" } })
+	end
+	horn("StubHorn", "Grade4", { length = 0.35, thickness = 0.11, curve = 10, segments = 3, taper = 0.3 })
+	horn("StraightHorn", "Grade4", { length = 1.0, thickness = 0.11, curve = 6, segments = 5 })
+	horn("CurvedHorn", "Grade3", { length = 1.3, thickness = 0.13, curve = 85, curveDir = { 1, 0.6 }, tilt = { 0, -10 }, segments = 8 })
+	horn("BackHorn", "Grade3", { length = 1.4, thickness = 0.13, curve = 70, curveDir = { 0, 1 }, tilt = { 35, 0 }, segments = 8 })
+	horn("ForwardHorn", "Grade3", { length = 1.1, thickness = 0.12, curve = 60, curveDir = { 0, -1 }, tilt = { -20, 0 } })
+	horn("RamHorn", "Grade3", {
+		length = 2.3, thickness = 0.17, taper = 0.25, curve = 330, curveDir = { 0.25, 1 }, spiral = 90, tilt = { 20, -15 },
+		segments = 14,
+	})
+	horn("Antler", "Grade2", {
+		length = 1.6, thickness = 0.09, taper = 0.35, curve = 35, curveDir = { 1, 0.4 }, branches = 3, ridges = false,
+		role = "BoneDark", baseRole = "BoneDark", rootRole = "SkinDark", segments = 7,
+	})
+	horn("BrokenHorn", "Grade3", { length = 1.3, thickness = 0.14, curve = 60, curveDir = { 1, 0.5 }, broken = 0.5, segments = 8 })
+	horn("MassiveHorn", "Grade2", {
+		length = 2.5, thickness = 0.3, taper = 0.08, curve = 95, curveDir = { 1, 0.25 }, tilt = { 0, -15 }, segments = 11,
+		tipRole = "Claw",
+	})
+
+	-- Horn sets: several horns placed on skull sockets. `count` counts against the grade cap.
+	local function hornSet(id, grade, count, placements, tags)
+		R.register({
+			id = id,
+			slots = { "Horns" },
+			grade = grade,
+			tags = tags or { "horn", "set" },
+			count = count,
+			params = { socket = "Crown" },
+			build = function(ctx, p, entry)
+				local scale = { ctx.scale.X, ctx.scale.Y, ctx.scale.Z }
+				local list = type(placements) == "function" and placements(p) or placements
+				for _, pl in ipairs(list) do
+					local params = table.clone(pl.params or {})
+					for k, v in pairs(entry.params or {}) do
+						params[k] = v
+					end
+					ctx.state.buildEntry(ctx, {
+						id = pl.id, socket = pl.socket, pos = pl.pos, rot = pl.rot, params = params, scale = scale,
+					})
+				end
+			end,
+		})
+	end
+
+	hornSet("HornPair", "Grade4", 2, {
+		{ id = "StraightHorn", socket = "TopR", params = { length = 0.8, curve = 25, curveDir = { 1, 0.3 } } },
+		{ id = "StraightHorn", socket = "TopL", params = { length = 0.8, curve = 25, curveDir = { 1, 0.3 } } },
+	})
+	hornSet("ThreeHorns", "Grade3", 3, {
+		{ id = "CurvedHorn", socket = "TopR", params = { length = 1.0 } },
+		{ id = "CurvedHorn", socket = "TopL", params = { length = 1.0 } },
+		{ id = "StraightHorn", socket = "Brow", params = { length = 0.7, curve = 30, curveDir = { 0, 1 } } },
+	})
+	hornSet("RamHorns", "Grade3", 2, {
+		{ id = "RamHorn", socket = "TopR" },
+		{ id = "RamHorn", socket = "TopL" },
+	})
+	hornSet("DemonHorns", "Grade3", 2, {
+		{ id = "BackHorn", socket = "TopR", params = { tipRole = "Claw", curveDir = { 0.35, 1 } } },
+		{ id = "BackHorn", socket = "TopL", params = { tipRole = "Claw", curveDir = { 0.35, 1 } } },
+	})
+	hornSet("UnicornHorn", "Grade3", 1, {
+		{ id = "StraightHorn", socket = "Brow", params = { length = 1.4, thickness = 0.12, curve = 12, curveDir = { 0, 1 } } },
+	})
+	hornSet("AsymmetricHorns", "Grade3", 2, {
+		{ id = "CurvedHorn", socket = "TopR", params = { length = 1.9, thickness = 0.17 } },
+		{ id = "BrokenHorn", socket = "TopL", params = { length = 1.0, broken = 0.65 } },
+	})
+	hornSet("Antlers", "Grade2", 2, {
+		{ id = "Antler", socket = "TopR" },
+		{ id = "Antler", socket = "TopL" },
+	})
+	R.register({
+		id = "CrownOfHorns",
+		slots = { "Horns" },
+		grade = "Grade2",
+		tags = { "horn", "set" },
+		params = { socket = "Crown", count = 6, radius = 0.42, length = 0.6 },
+		count = function(p)
+			return p.count
+		end,
+		build = function(ctx, p)
+			local at = A.at(ctx)
+			for i = 1, p.count do
+				local a = (i - 0.5) / p.count * math.pi * 2
+				local x, z = math.cos(a) * p.radius, math.sin(a) * p.radius
+				local anchor = ctx:sub(at, { x, -0.05, z }, { math.deg(math.sin(a)) * 0.45, 0, -math.deg(math.cos(a)) * 0.45 })
+				buildHorn(ctx, {
+					length = p.length * (0.8 + 0.4 * ((i % 3) / 2)), thickness = 0.08, taper = 0.1, curve = 10,
+					curveDir = { x, z }, segments = 4, ridges = false, role = "Bone", baseRole = "BoneDark", rootRole = "Skin",
+				}, anchor)
+			end
+		end,
+	})
+end
+]]></ProtectedString></Properties></Item><Item class="ModuleScript" referent="RBX7"><Properties><string name="Name">Limbs</string><ProtectedString name="Source"><![CDATA[--!nonstrict
+--[[
+	Arms, hands, legs, feet. Authored for the RIGHT side in the limb part's own frame
+	(R6 limb: 1x2x1, top = joint end at y=+1, +X = outward for the right side); the
+	builder mirrors them for the left. The same components build extra limbs: they
+	receive entry.part (the extra limb part) and socket suffix E1/X1…
+
+	Arms define Hand_<s> (and Elbow_, Forearm_, UpperArm_, Shoulder_); hands only build
+	where an arm defined that socket. Legs define Foot_<s>; feet likewise.
+]]
+
+local A = require(script.Parent._Anatomy)
+
+local function limbPart(ctx, entry, kind)
+	return ctx:anchor(entry.part or ctx:basePart(ctx.sideName .. " " .. kind))
+end
+
+local function hasOwnSocket(ctx, base)
+	return ctx.state.sockets[ctx:sided(base)] ~= nil
+end
+
+local function handY(ctx)
+	return -1 - (ctx:m("ArmLength") - 1) * 2.2
+end
+
+local function armSockets(ctx, arm, shoulder, elbow, wrist, t, withHand)
+	ctx:defineSocket(ctx:sided("Shoulder"), arm, A.add(shoulder, { 0, 0.15, 0 }), A.UP)
+	ctx:defineSocket(ctx:sided("UpperArm"), arm, A.add(A.lerp(shoulder, elbow, 0.5), { 0.45 * t, 0, 0 }), A.RIGHT)
+	ctx:defineSocket(ctx:sided("Elbow"), arm, A.add(elbow, { 0, 0, 0.4 * t }), A.BACK)
+	ctx:defineSocket(ctx:sided("Forearm"), arm, A.add(A.lerp(elbow, wrist, 0.5), { 0.4 * t, 0, 0 }), A.RIGHT)
+	if withHand ~= false then
+		ctx:defineSocket(ctx:sided("Hand"), arm, wrist, A.DOWN)
+		ctx:defineSocket(ctx:sided("Palm"), arm, A.add(wrist, { -0.3, -0.3, 0 }), { 0, 0, 90 })
+	end
+end
+
+return function(R)
+	---------------------------------------------------------------------------- arms
+	R.register({
+		id = "NormalArm",
+		slots = { "Arms" },
+		grade = "Grade4",
+		tags = { "arm" },
+		params = { upper = 0.42, fore = 0.38, deltoid = 1, biceps = 0, flesh = false, ridge = false, lumps = 0, veins = false },
+		build = function(ctx, p, entry)
+			local arm = limbPart(ctx, entry, "Arm")
+			-- girth grows sub-linearly with mass so heavy bodies stay readable
+			local t = ctx:m("ArmThick") ^ 0.75
+			local hy = handY(ctx)
+			local S, E, W = { 0, 0.72, 0 }, { 0.03, 0.72 + (hy - 0.72) * 0.47, 0.08 }, { 0, hy + 0.15, -0.06 }
+			ctx:blob(arm, { 0.05, 0.78, 0 }, { 1.2 * t * p.deltoid, 0.9 * t * p.deltoid, 1.2 * t * p.deltoid }, { 0, 0, 10 }, "SkinLight")
+			ctx:capsule(arm, S, E, p.upper * t, "Skin")
+			if p.biceps > 0 then
+				ctx:blob(arm, A.add(A.lerp(S, E, 0.45), { 0, 0, -0.2 * t }), { 0.8 * t, 0.9 * p.biceps * 2, 0.6 * t }, nil, "SkinLight")
+			end
+			ctx:blob(arm, A.add(E, { 0.02, 0, 0.12 }), { 0.9 * p.fore / 0.38 * t, 0.6, 0.85 * t }, nil, "SkinDark")
+			ctx:capsule(arm, E, W, { p.fore * t, p.fore * t * 0.9 }, "Skin")
+			if p.flesh then
+				ctx:capsule(arm, A.add(E, { -0.32 * t, -0.1, -0.12 }), A.add(W, { -0.3 * t, 0.2, -0.12 }), { 0.2 * t, 0.36 * t }, "Flesh")
+				for k = 1, 4 do
+					local q = A.lerp(E, W, k / 5)
+					ctx:blob(arm, A.add(q, { -0.46 * t, 0, -0.18 }), { 0.16, 0.07, 0.55 * t }, nil, "FleshDark")
+				end
+			end
+			if p.ridge then
+				ctx:capsule(arm, A.add(E, { 0.42 * t, -0.2, 0 }), A.add(W, { 0.38 * t, 0.35, 0 }), { 0.14 * t, 0.28 * t }, "SkinLight")
+			end
+			if p.veins then
+				for k = 1, 3 do
+					local a = A.lerp(S, W, 0.2 + k * 0.2)
+					ctx:capsule(arm, A.add(a, { 0.1, 0.25, -p.upper * t }), A.add(a, { -0.05, -0.25, -p.upper * t * 0.95 }), 0.035, "SkinDark")
+				end
+			end
+			for _ = 1, p.lumps do
+				local q = A.lerp(S, W, ctx:rand(0.1, 0.9))
+				local r = ctx:rand(0.25, 0.5) * t
+				ctx:blob(arm, A.add(q, { ctx:rand(-0.3, 0.4) * t, 0, ctx:rand(-0.3, 0.3) * t }), { r * 1.3, r * 1.5, r * 1.2 }, nil,
+					ctx:rand(0, 1) > 0.5 and "SkinLight" or "Flesh")
+			end
+			armSockets(ctx, arm, S, E, W, t)
+		end,
+	})
+
+	local function arm(id, grade, params, extra)
+		local def = { id = id, grade = grade, params = params, tags = { "arm" } }
+		for k, v in pairs(extra or {}) do
+			def[k] = v
+		end
+		R.variant("NormalArm", def)
+	end
+	arm("MuscularArm", "Grade4", { upper = 0.5, fore = 0.46, deltoid = 1.1, biceps = 0.45, veins = true })
+	arm("ThinArm", "Grade4", { upper = 0.22, fore = 0.2, deltoid = 0.6 })
+	arm("HeavyArm", "Grade3", { upper = 0.52, fore = 0.5, deltoid = 0.95, flesh = true, ridge = true }) -- the reference
+	arm("EnlargedForearm", "Grade3", { upper = 0.36, fore = 0.72, deltoid = 0.9, ridge = true })
+	arm("DeformedArm", "Grade2", { upper = 0.45, fore = 0.5, lumps = 6, flesh = true })
+	arm("LongArm", "Grade3", { upper = 0.34, fore = 0.32, deltoid = 0.85 }, {
+		mutate = function(body, _, _, sideName)
+			if sideName then
+				body.side[sideName].ArmLength = (body.side[sideName].ArmLength or 1) * 1.4
+			end
+		end,
+	})
+	arm("ShortArm", "Grade3", { upper = 0.45, fore = 0.42 }, {
+		mutate = function(body, _, _, sideName)
+			if sideName then
+				body.side[sideName].ArmLength = (body.side[sideName].ArmLength or 1) * 0.72
+			end
+		end,
+	})
+
+	R.register({
+		id = "BoneArm",
+		slots = { "Arms" },
+		grade = "Grade2",
+		tags = { "arm", "bone" },
+		build = function(ctx, _, entry)
+			local arm = limbPart(ctx, entry, "Arm")
+			local t = ctx:m("ArmThick")
+			local hy = handY(ctx)
+			local S, E, W = { 0, 0.72, 0 }, { 0.03, 0.72 + (hy - 0.72) * 0.47, 0.08 }, { 0, hy + 0.15, -0.06 }
+			ctx:blob(arm, { 0.05, 0.8, 0 }, { 1.0 * t, 0.8 * t, 1.0 * t }, nil, "SkinDark")
+			ctx:capsule(arm, S, E, 0.14 * t, "Bone")
+			ctx:capsule(arm, A.add(E, { 0.07, 0, 0 }), A.add(W, { 0.07, 0, 0 }), 0.09 * t, "Bone")
+			ctx:capsule(arm, A.add(E, { -0.07, 0, -0.05 }), A.add(W, { -0.07, 0, -0.05 }), 0.08 * t, "BoneDark")
+			ctx:blob(arm, E, { 0.35 * t, 0.3, 0.35 * t }, nil, "BoneDark")
+			ctx:blob(arm, W, { 0.3 * t, 0.2, 0.3 * t }, nil, "BoneDark")
+			for k = 1, 3 do
+				local a = ({ 0.2, -0.2, 0.05 })[k]
+				ctx:capsule(arm, A.add(S, { a, -0.1, 0.1 }), A.add(A.lerp(E, W, 0.4), { a * 0.6, 0, -0.1 }), 0.04, "SkinDark")
+			end
+			armSockets(ctx, arm, S, E, W, t)
+		end,
+	})
+
+	R.register({
+		id = "TentacleArm",
+		slots = { "Arms" },
+		grade = "Grade2",
+		tags = { "arm", "tentacle" },
+		params = { segments = 6, radius = 0.4, hand = false },
+		build = function(ctx, p, entry)
+			local arm = limbPart(ctx, entry, "Arm")
+			local t = ctx:m("ArmThick")
+			local reach = 1.7 - handY(ctx)
+			local segs = {}
+			for i = 1, p.segments do
+				local k = (i - 1) / (p.segments - 1)
+				table.insert(segs, { reach / p.segments, p.radius * t * (1 - 0.7 * k), { i == 1 and 0 or 6, 0, i == 1 and 5 or -4 } })
+			end
+			ctx:blob(arm, { 0.05, 0.75, 0 }, { 1.2 * t, 0.9 * t, 1.2 * t }, nil, "SkinLight")
+			local chain = ctx:chain(arm, { 0, 0.8, 0 }, nil, segs, {
+				name = "Tentacle",
+				sway = { amp = 9, speed = 1.1 },
+				flesh = function(c, seg, i, len, r)
+					c:blob(seg, { 0, 0, 0 }, { r * 2, len * 1.35, r * 2 }, nil, i % 2 == 0 and "SkinLight" or "Skin")
+					c:blob(seg, { 0, 0, -r * 0.55 }, { r * 1.1, len * 0.9, r * 0.9 }, nil, "Flesh")
+				end,
+			})
+			if p.hand then
+				local tip = chain[#chain]
+				ctx:defineSocket(ctx:sided("Hand"), tip.anchor, { 0, -tip.length / 2, 0 }, A.DOWN)
+			end
+		end,
+	})
+
+	R.register({
+		id = "MultiJointArm",
+		slots = { "Arms" },
+		grade = "Grade1",
+		tags = { "arm", "abnormal" },
+		params = { joints = 3, radius = 0.26 },
+		build = function(ctx, p, entry)
+			local arm = limbPart(ctx, entry, "Arm")
+			local t = ctx:m("ArmThick")
+			local reach = 1.8 - handY(ctx)
+			local segs = {}
+			for i = 1, p.joints do
+				table.insert(segs, { reach / p.joints * 1.08, p.radius * t * (1 - 0.15 * i), { i == 1 and -10 or 22, 0, i == 1 and 6 or -8 } })
+			end
+			ctx:blob(arm, { 0.05, 0.78, 0 }, { 1.1 * t, 0.85 * t, 1.1 * t }, nil, "SkinLight")
+			local chain = ctx:chain(arm, { 0, 0.8, 0 }, nil, segs, {
+				name = "Joint",
+				sway = { amp = 4, speed = 0.8 },
+				flesh = function(c, seg, i, len, r)
+					c:capsule(seg, { 0, len / 2, 0 }, { 0, -len / 2, 0 }, r, "Skin", { stretch = 1.05 })
+					c:blob(seg, { 0, -len / 2, 0.05 }, { r * 2.4, r * 2.2, r * 2.4 }, nil, "SkinDark")
+				end,
+			})
+			local tip = chain[#chain]
+			ctx:defineSocket(ctx:sided("Hand"), tip.anchor, { 0, -tip.length / 2, 0 }, A.DOWN)
+		end,
+	})
+
+	R.register({
+		id = "ScytheArm",
+		slots = { "Arms" },
+		grade = "Grade2",
+		tags = { "arm", "blade", "insect" },
+		params = { blade = 1.6 },
+		build = function(ctx, p, entry)
+			local arm = limbPart(ctx, entry, "Arm")
+			local t = ctx:m("ArmThick")
+			local hy = handY(ctx)
+			local S, E, W = { 0, 0.72, 0 }, { 0.03, 0.72 + (hy - 0.72) * 0.45, 0.1 }, { 0, hy + 0.2, -0.1 }
+			ctx:capsule(arm, S, E, 0.26 * t, "SkinDark")
+			ctx:capsule(arm, E, W, 0.22 * t, "Skin")
+			ctx:blob(arm, E, { 0.4 * t, 0.35, 0.4 * t }, nil, "SkinDark")
+			local tip = A.add(W, { 0, -p.blade * 0.35, -p.blade * 0.55 })
+			ctx:triangle(arm, W, A.add(W, { 0, 0.35, 0.05 }), tip, "Claw", 0.08)
+			ctx:triangle(arm, W, tip, A.add(W, { 0, -0.2, -0.25 }), "Claw", 0.08)
+			for k = 1, 4 do
+				local q = A.lerp(W, tip, k / 5)
+				ctx:capsule(arm, q, A.add(q, { 0, 0.12, 0.05 }), 0.03, "Teeth")
+			end
+			armSockets(ctx, arm, S, E, W, t, false)
+		end,
+	})
+
+	---------------------------------------------------------------------------- hands
+	R.register({
+		id = "Hand",
+		slots = { "Hands" },
+		grade = "Grade4",
+		tags = { "hand" },
+		params = { size = 1, fingers = 4, fingerLen = 0.42, fingerThick = 0.085, curl = 0.35, claw = 0, blade = 0,
+			thumb = true, fist = false, stumps = 0 },
+		build = function(ctx, p)
+			if not hasOwnSocket(ctx, "Hand") then
+				return
+			end
+			local hand = ctx:socket(ctx:sided("Hand"))
+			local h = ctx:m("Hand") * p.size
+			local flags = ctx.body.flags or {}
+			local missing = (ctx.suffix == "R" or ctx.suffix == "L") and (flags["MissingFingers" .. ctx.sideName] or 0) or 0
+			local n = math.max(0, p.fingers - missing)
+			p = table.clone(p)
+			p.stumps += p.fingers - n
+			if p.fist then
+				ctx:blob(hand, { 0, 0.32 * h, -0.02 }, { 0.72 * h, 0.62 * h, 0.66 * h }, nil, "Skin")
+			else
+				ctx:blob(hand, { 0, 0.26 * h, 0 }, { 0.42 * h, 0.55 * h, 0.62 * h }, nil, "Skin")
+			end
+			for i = 1, n + p.stumps do
+				local z = n + p.stumps == 1 and 0 or ((i - 1) / (n + p.stumps - 1) - 0.5) * 0.5 * h
+				local r = p.fingerThick * h * (1 - math.abs(z) * 0.4)
+				if i > n then
+					ctx:blob(hand, { -0.04, 0.55 * h, z }, { r * 2.2, r * 1.6, r * 2.2 }, nil, "SkinDark")
+				elseif p.fist then
+					ctx:blob(hand, { -0.2 * h, 0.52 * h, z * 1.2 }, { r * 3, r * 3.2, r * 2.4 }, nil, "SkinLight")
+				else
+					local L = p.fingerLen * h * (1 - math.abs(z) * 0.5)
+					local c = p.curl
+					local pts = { { 0, 0.48 * h, z }, { -0.06 * c, 0.48 * h + L * 0.5, z }, { -0.22 * c, 0.48 * h + L * 0.9, z } }
+					ctx:tube(hand, pts, { r, r * 0.9, r * 0.75 }, "Skin")
+					local tip, dir = pts[3], A.lerp({ -0.1 * c, 1, 0 }, { -1, 0.4, 0 }, c * 0.5)
+					if p.claw > 0 then
+						ctx:tube(hand, { tip, A.add(tip, dir, p.claw * 0.6 * h), A.add(A.add(tip, dir, p.claw * h), { -0.12 * p.claw, 0, 0 }) },
+							{ r * 0.8, r * 0.45, r * 0.1 }, "Claw")
+					end
+					if p.blade > 0 then
+						local e = A.add(tip, { -0.05, p.blade * h, 0 })
+						ctx:triangle(hand, A.add(tip, { 0, 0, -r }), A.add(tip, { 0, 0, r }), e, "Claw", 0.05)
+					end
+				end
+			end
+			if p.thumb then
+				local a, b = { -0.12 * h, 0.2 * h, 0.3 * h }, { -0.28 * h, 0.42 * h, 0.34 * h }
+				ctx:tube(hand, { a, b, A.add(b, { -0.05, 0.12 * h, 0.02 }) }, { p.fingerThick * h * 1.2, p.fingerThick * h, p.fingerThick * h * 0.8 }, "Skin")
+				if p.claw > 0 then
+					ctx:capsule(hand, A.add(b, { -0.05, 0.12 * h, 0.02 }), A.add(b, { -0.12, 0.12 * h + p.claw * 0.6 * h, 0 }), p.fingerThick * h * 0.6, "Claw")
+				end
+			end
+		end,
+	})
+
+	local function hand(id, grade, params)
+		R.variant("Hand", { id = id, grade = grade, params = params, tags = { "hand" } })
+	end
+	hand("Fist", "Grade4", { fist = true, size = 1.15 })
+	hand("ClawedHand", "Grade3", { claw = 0.28, curl = 0.5 })
+	hand("BladedFingers", "Grade2", { blade = 1.1, fingerThick = 0.065, curl = 0, fingerLen = 0.3 })
+	hand("TalonHand", "Grade3", { fingers = 3, fingerLen = 0.7, claw = 0.35, curl = 0.65, fingerThick = 0.09 })
+	hand("OversizedHand", "Grade3", { size = 1.65, claw = 0.12, curl = 0.45 })
+	hand("ExtraFingersHand", "Grade3", { fingers = 7, fingerThick = 0.07, curl = 0.4 })
+	hand("MissingFingersHand", "Grade4", { fingers = 2, stumps = 2, curl = 0.3 })
+
+	---------------------------------------------------------------------------- legs
+	local function legBottom(ctx)
+		return -1 - ctx.layout.legExtra
+	end
+
+	R.register({
+		id = "NormalLeg",
+		slots = { "Legs" },
+		grade = "Grade4",
+		tags = { "leg" },
+		params = { thigh = 0.5, shin = 0.4, flesh = false, calf = 0.3 },
+		build = function(ctx, p, entry)
+			local leg = limbPart(ctx, entry, "Leg")
+			local t = ctx:m("LegThick")
+			local bottom = legBottom(ctx)
+			local H, K, An = { 0.03, 0.78, 0.03 }, { 0, 0.8 + (bottom - 0.8) * 0.5, -0.1 }, { 0, bottom + 0.25, 0.06 }
+			ctx:capsule(leg, H, K, { p.thigh * t, p.thigh * t * 1.02 }, "Skin", { stretch = 1.3 })
+			if p.flesh then
+				ctx:capsule(leg, A.add(H, { -0.12 * t, 0, -0.3 * t }), A.add(K, { -0.1 * t, 0.15, -0.28 * t }), { 0.42 * t, 0.36 * t }, "Flesh")
+				for k = 1, 3 do
+					local q = A.lerp(H, K, k / 4)
+					ctx:blob(leg, A.add(q, { -0.12 * t, 0, -0.62 * t }), { 0.6 * t, 0.07, 0.18 }, nil, "FleshDark")
+				end
+				ctx:capsule(leg, A.add(K, { -0.28 * t, -0.1, 0.05 }), A.add(An, { -0.22 * t, 0.2, 0.05 }), { 0.16 * t, 0.26 * t }, "Flesh")
+			end
+			ctx:blob(leg, A.add(K, { 0, 0.02, -0.05 }), { 0.85 * t, 0.62, 0.8 * t }, nil, "SkinLight")
+			ctx:capsule(leg, K, An, { p.shin * t, p.shin * t * 1.05 }, "Skin")
+			if p.calf > 0 then
+				ctx:blob(leg, A.add(A.lerp(K, An, 0.3), { 0, 0, 0.18 * t }), { 0.7 * t, 0.8, p.calf * 2 * t }, nil, "Skin")
+			end
+			ctx:blob(leg, An, { 0.62 * t, 0.4, 0.66 * t }, nil, "SkinDark")
+			ctx:defineSocket(ctx:sided("Thigh"), leg, A.add(A.lerp(H, K, 0.5), { 0, 0, -p.thigh * t }), A.FRONT)
+			ctx:defineSocket(ctx:sided("Knee"), leg, A.add(K, { 0, 0, -0.4 * t }), A.FRONT)
+			ctx:defineSocket(ctx:sided("Shin"), leg, A.add(A.lerp(K, An, 0.5), { p.shin * t, 0, 0 }), A.RIGHT)
+			ctx:defineSocket(ctx:sided("Foot"), leg, { 0, bottom, 0 }, A.UP)
+		end,
+	})
+	local function leg(id, grade, params, extra)
+		local def = { id = id, grade = grade, params = params, tags = { "leg" } }
+		for k, v in pairs(extra or {}) do
+			def[k] = v
+		end
+		R.variant("NormalLeg", def)
+	end
+	leg("MassiveLeg", "Grade3", { thigh = 0.72, shin = 0.58, calf = 0.45 })
+	leg("ThinLeg", "Grade4", { thigh = 0.27, shin = 0.21, calf = 0.1 })
+	leg("HuskLeg", "Grade3", { thigh = 0.55, shin = 0.42, flesh = true }) -- the reference
+	leg("LongLeg", "Grade3", { thigh = 0.42, shin = 0.34 }, {
+		mutate = function(body)
+			body.layout.legExtra += 0.4
+		end,
+	})
+	leg("ShortLeg", "Grade3", { thigh = 0.55, shin = 0.48 }, {
+		mutate = function(body)
+			body.layout.legExtra -= 0.25
+		end,
+	})
+
+	R.register({
+		id = "DigitigradeLeg",
+		slots = { "Legs" },
+		grade = "Grade2",
+		tags = { "leg", "beast" },
+		mutate = function(body)
+			body.layout.legExtra += 0.2
+		end,
+		build = function(ctx, _, entry)
+			local leg = limbPart(ctx, entry, "Leg")
+			local t = ctx:m("LegThick")
+			local bottom = legBottom(ctx)
+			local span = 0.8 - bottom
+			local H, K = { 0.03, 0.78, 0.05 }, { 0, 0.8 - span * 0.33, -0.38 }
+			local Hk, B = { 0, bottom + span * 0.33, 0.42 }, { 0, bottom + 0.14, -0.18 }
+			ctx:capsule(leg, H, K, 0.52 * t, "Skin", { stretch = 1.3 })
+			ctx:blob(leg, K, { 0.7 * t, 0.55, 0.7 * t }, nil, "SkinLight")
+			ctx:capsule(leg, K, Hk, { 0.3 * t, 0.26 * t }, "Skin")
+			ctx:blob(leg, Hk, { 0.42 * t, 0.42, 0.5 * t }, nil, "SkinDark")
+			ctx:capsule(leg, Hk, B, 0.19 * t, "SkinDark")
+			ctx:defineSocket(ctx:sided("Thigh"), leg, A.add(A.lerp(H, K, 0.5), { 0, 0, -0.5 * t }), A.FRONT)
+			ctx:defineSocket(ctx:sided("Knee"), leg, A.add(K, { 0, 0, -0.35 * t }), A.FRONT)
+			ctx:defineSocket(ctx:sided("Shin"), leg, A.add(A.lerp(K, Hk, 0.5), { 0.3 * t, 0, 0 }), A.RIGHT)
+			ctx:defineSocket(ctx:sided("Foot"), leg, { 0, bottom, -0.18 }, A.UP)
+		end,
+	})
+
+	R.register({
+		id = "ReverseJointLeg",
+		slots = { "Legs" },
+		grade = "Grade2",
+		tags = { "leg", "bird" },
+		build = function(ctx, _, entry)
+			local leg = limbPart(ctx, entry, "Leg")
+			local t = ctx:m("LegThick")
+			local bottom = legBottom(ctx)
+			local H, K, An = { 0.03, 0.78, 0 }, { 0, 0.8 + (bottom - 0.8) * 0.45, 0.42 }, { 0, bottom + 0.22, -0.08 }
+			ctx:capsule(leg, H, K, 0.45 * t, "Skin", { stretch = 1.3 })
+			ctx:blob(leg, K, { 0.55 * t, 0.5, 0.6 * t }, nil, "SkinDark")
+			ctx:capsule(leg, A.add(K, { 0, 0, 0.15 }), A.add(K, { 0, 0.25, 0.55 }), { 0.1, 0.1 }, "Bone")
+			ctx:capsule(leg, K, An, 0.26 * t, "SkinDark")
+			ctx:blob(leg, An, { 0.4 * t, 0.3, 0.45 * t }, nil, "SkinDark")
+			ctx:defineSocket(ctx:sided("Thigh"), leg, A.add(A.lerp(H, K, 0.5), { 0, 0, -0.4 * t }), A.FRONT)
+			ctx:defineSocket(ctx:sided("Knee"), leg, A.add(K, { 0, 0, 0.35 * t }), A.BACK)
+			ctx:defineSocket(ctx:sided("Shin"), leg, A.add(A.lerp(K, An, 0.5), { 0.3 * t, 0, 0 }), A.RIGHT)
+			ctx:defineSocket(ctx:sided("Foot"), leg, { 0, bottom, -0.08 }, A.UP)
+		end,
+	})
+
+	R.register({
+		id = "InsectLeg",
+		slots = { "Legs" },
+		grade = "Grade2",
+		tags = { "leg", "insect" },
+		build = function(ctx, _, entry)
+			local leg = limbPart(ctx, entry, "Leg")
+			local t = ctx:m("LegThick")
+			local bottom = legBottom(ctx)
+			local H, J, T, tip = { 0, 0.8, 0 }, { 0.55, 0.55, -0.1 }, { 0.45, bottom + 0.5, -0.15 }, { 0.3, bottom, -0.2 }
+			ctx:capsule(leg, H, J, 0.2 * t, "SkinDark")
+			ctx:blob(leg, J, { 0.3 * t, 0.3, 0.3 * t }, nil, "Skin")
+			ctx:capsule(leg, J, T, 0.14 * t, "SkinDark")
+			ctx:blob(leg, T, { 0.22 * t, 0.22, 0.22 * t }, nil, "Skin")
+			ctx:tube(leg, { T, A.lerp(T, tip, 0.6), tip }, { 0.1 * t, 0.06, 0.02 }, "Claw")
+		end,
+	})
+
+	-- Special Grade: no legs — a coiling serpent body carries the torso.
+	R.register({
+		id = "SerpentBody",
+		slots = { "Legs" },
+		grade = "SpecialGrade",
+		tags = { "abnormal", "serpent" },
+		params = { segments = 9, radius = 0.95 },
+		build = function(ctx, p)
+			if ctx.side < 0 then
+				return -- one body, built once
+			end
+			local W = ctx:m("TorsoW")
+			local segs = {}
+			local bends = { 0, 25, 45, 40, 25, 30, 35, 35, 40, 40 }
+			for i = 1, p.segments do
+				table.insert(segs, { 0.95, p.radius * W * (1 - 0.72 * (i - 1) / p.segments), { i <= 3 and -bends[i] or -12, 0, i > 3 and 28 or 0 } })
+			end
+			ctx:with({ side = 1 }, function()
+				ctx:chain("Torso", { 0, -1.05, 0.15 }, { -8, 0, 0 }, segs, {
+					name = "Serpent",
+					sway = { amp = 3, speed = 0.6 },
+					flesh = function(c, seg, i, len, r)
+						c:blob(seg, { 0, 0, 0 }, { r * 2, len * 1.4, r * 2 }, nil, i % 2 == 0 and "SkinLight" or "Skin")
+						c:blob(seg, { 0, 0, -r * 0.62 }, { r * 1.3, len * 1.1, r * 0.8 }, nil, "Flesh")
+						c:blob(seg, { 0, len * 0.3, r * 0.75 }, { r * 0.8, len * 0.3, r * 0.4 }, nil, "SkinDark")
+					end,
+				})
+			end)
+		end,
+	})
+
+	R.register({
+		id = "TendrilMass",
+		slots = { "Legs" },
+		grade = "Grade1",
+		tags = { "abnormal", "tendril" },
+		params = { tendrils = 4 },
+		build = function(ctx, p, entry)
+			local leg = limbPart(ctx, entry, "Leg")
+			local t = ctx:m("LegThick")
+			local bottom = legBottom(ctx)
+			local span = 0.8 - bottom
+			ctx:blob(leg, { 0, 0.7, 0 }, { 1.2 * t, 0.9, 1.2 * t }, nil, "Skin")
+			for i = 1, p.tendrils do
+				local a = i / p.tendrils * math.pi * 2
+				local segs = {}
+				for k = 1, 4 do
+					table.insert(segs, { span / 4 * 1.1, 0.2 * t * (1 - 0.18 * k), { k == 1 and math.cos(a) * 15 or 4, 0, k == 1 and -math.sin(a) * 15 or 0 } })
+				end
+				ctx:chain(leg, { math.sin(a) * 0.25 * t, 0.6, math.cos(a) * 0.25 * t }, nil, segs,
+					{ name = "LegTendril", sway = { amp = 6, speed = 1.3 } })
+			end
+		end,
+	})
+
+	---------------------------------------------------------------------------- feet
+	R.register({
+		id = "Foot",
+		slots = { "Feet" },
+		grade = "Grade4",
+		tags = { "foot" },
+		params = { size = 1, length = 1.1, width = 0.8, toes = 4, toeLen = 0.25, claw = 0, backToe = false, hoof = false, lumps = 0 },
+		build = function(ctx, p)
+			if not hasOwnSocket(ctx, "Foot") then
+				return
+			end
+			local foot = ctx:socket(ctx:sided("Foot"))
+			local f = ctx:m("Foot") * p.size
+			if p.hoof then
+				ctx:blob(foot, { 0, 0.55 * f, 0.02 }, { 0.62 * f, 0.6 * f, 0.66 * f }, nil, "SkinDark")
+				ctx:capsule(foot, { 0, 0.02, 0 }, { 0, 0.42 * f, 0 }, { 0.36 * f, 0.4 * f }, "Claw", { stretch = 1.05 })
+				ctx:blob(foot, { 0, 0.22 * f, -0.36 * f }, { 0.05, 0.4 * f, 0.1 }, nil, "Void")
+				return
+			end
+			ctx:blob(foot, { 0, 0.18 * f, 0.18 * f }, { 0.55 * f, 0.36 * f, 0.55 * f }, nil, "SkinDark")
+			ctx:blob(foot, { 0, 0.18 * f, -0.35 * p.length * f }, { p.width * f, 0.36 * f, p.length * f }, nil, "Skin")
+			for i = 1, p.toes do
+				local x = p.toes == 1 and 0 or ((i - 1) / (p.toes - 1) - 0.5) * p.width * 0.8 * f
+				local spread = x * 0.35
+				local base = { x, 0.12 * f, -0.75 * p.length * f }
+				local tip = { x + spread, 0.1 * f, base[3] - p.toeLen * f }
+				ctx:capsule(foot, base, tip, 0.1 * f, i % 2 == 0 and "SkinLight" or "Skin", { stretch = 1.35 })
+				if p.claw > 0 then
+					ctx:tube(foot, { tip, A.add(tip, { spread * 0.3, -0.02, -p.claw * 0.6 * f }), A.add(tip, { spread * 0.4, -0.08, -p.claw * f }) },
+						{ 0.08 * f, 0.05 * f, 0.02 }, "Claw")
+				end
+			end
+			if p.backToe then
+				ctx:tube(foot, { { 0, 0.1 * f, 0.3 * f }, { 0, 0.06 * f, 0.6 * f }, { 0, 0.02, 0.75 * f } }, { 0.09 * f, 0.07 * f, 0.03 }, "Claw")
+			end
+			for _ = 1, p.lumps do
+				local r = ctx:rand(0.15, 0.3) * f
+				ctx:blob(foot, { ctx:rand(-0.3, 0.3) * f, 0.3 * f, ctx:rand(-0.6, 0.2) * f }, { r, r, r }, nil, "SkinLight")
+			end
+		end,
+	})
+	local function foot(id, grade, params)
+		R.variant("Foot", { id = id, grade = grade, params = params, tags = { "foot" } })
+	end
+	foot("EnlargedFoot", "Grade3", { length = 1.25, width = 0.9, toes = 4, toeLen = 0.65, claw = 0.2 }) -- the reference
+	foot("ClawedFoot", "Grade3", { toes = 3, toeLen = 0.35, claw = 0.3 })
+	foot("HoofFoot", "Grade3", { hoof = true })
+	foot("TalonFoot", "Grade2", { toes = 3, toeLen = 0.8, claw = 0.35, width = 0.6, length = 0.7, backToe = true })
+	foot("DeformedFoot", "Grade2", { toes = 5, toeLen = 0.2, width = 1.0, lumps = 4 })
+end
+]]></ProtectedString></Properties></Item><Item class="ModuleScript" referent="RBX8"><Properties><string name="Name">Torsos</string><ProtectedString name="Source"><![CDATA[--!nonstrict
+-- Base torsos. Built in the leaned "spine" frame (origin at the pelvis) and scaled by
+-- the body's TorsoW/H/D, so hunch and mass change every torso the same way.
+
+local A = require(script.Parent._Anatomy)
+
+return function(R)
+	local function torso(def)
+		def.slots = { "Torso" }
+		R.register(def)
+	end
+
+	torso({
+		id = "NormalTorso",
+		grade = "Grade4",
+		tags = { "humanoid" },
+		build = function(ctx)
+			local spine = A.spine(ctx)
+			ctx:with({ scale = A.torsoScale(ctx) }, function()
+				ctx:blob(spine, { 0, 1.45, 0 }, { 2.1, 1.25, 1.15 }, nil, "Skin")
+				ctx:blob(spine, { 0, 1.95, 0.1 }, { 1.5, 0.5, 0.9 }, nil, "SkinLight")
+				ctx:blob(spine, { 0, 0.8, -0.02 }, { 1.75, 1.2, 1.0 }, nil, "Skin")
+				ctx:blob(spine, { 0.45, 1.5, -0.42 }, { 0.85, 0.6, 0.35 }, { 0, 0, 5 }, "SkinLight")
+				ctx:blob(spine, { -0.45, 1.5, -0.42 }, { 0.85, 0.6, 0.35 }, { 0, 0, -5 }, "SkinLight")
+				ctx:blob(spine, { 0, 1.35, -0.56 }, { 0.08, 0.8, 0.1 }, nil, "SkinDark")
+				ctx:blob(spine, { 0, 0.95, 0.33 }, { 1.6, 1.3, 0.55 }, nil, "Skin")
+				A.torsoSockets(ctx, spine, { front = 0.6, back = 0.58, width = 1.0 })
+			end)
+			A.pelvisAndNeck(ctx)
+		end,
+	})
+
+	torso({
+		id = "MuscularTorso",
+		grade = "Grade4",
+		tags = { "muscle" },
+		build = function(ctx)
+			local spine = A.spine(ctx)
+			ctx:with({ scale = A.torsoScale(ctx) }, function()
+				ctx:blob(spine, { 0, 1.4, 0 }, { 2.3, 1.35, 1.25 }, nil, "Skin")
+				ctx:blob(spine, { 0, 2.0, 0.15 }, { 1.8, 0.75, 1.05 }, { 8, 0, 0 }, "SkinLight")
+				for _, s in ipairs({ 1, -1 }) do
+					ctx:blob(spine, { 0.5 * s, 1.5, -0.45 }, { 1.05, 0.8, 0.55 }, { 0, 0, 8 * s }, "SkinLight")
+					ctx:blob(spine, { 0.95 * s, 1.25, 0.1 }, { 0.6, 1.35, 0.95 }, { 0, 0, 15 * s }, "Skin")
+					ctx:blob(spine, { 0.72 * s, 0.6, -0.18 }, { 0.5, 0.85, 0.65 }, { 0, 0, -8 * s }, "Skin")
+					for row, y in ipairs({ 1.02, 0.74, 0.46 }) do
+						ctx:blob(spine, { 0.21 * s, y, -0.5 + row * 0.02 }, { 0.36, 0.26, 0.22 }, nil, "SkinLight")
+					end
+				end
+				ctx:blob(spine, { 0, 0.75, -0.05 }, { 1.7, 1.1, 1.0 }, nil, "Skin")
+				ctx:blob(spine, { 0, 1.2, 0.42 }, { 1.9, 1.5, 0.6 }, nil, "Skin")
+				ctx:blob(spine, { 0, 1.2, 0.66 }, { 0.12, 1.3, 0.1 }, nil, "SkinDark")
+				A.torsoSockets(ctx, spine, { front = 0.7, back = 0.72, width = 1.15, top = 2.2 })
+			end)
+			A.pelvisAndNeck(ctx)
+		end,
+	})
+
+	torso({
+		id = "EmaciatedTorso",
+		grade = "Grade4",
+		tags = { "thin", "bone" },
+		build = function(ctx)
+			local spine = A.spine(ctx)
+			ctx:with({ scale = A.torsoScale(ctx, 0.85, 1, 0.85) }, function()
+				ctx:blob(spine, { 0, 1.35, 0 }, { 1.7, 1.45, 0.95 }, nil, "SkinDark")
+				ctx:blob(spine, { 0, 0.55, 0.05 }, { 1.15, 0.9, 0.62 }, nil, "SkinDeep")
+				for i = 1, 5 do
+					local y = 1.85 - i * 0.2
+					for _, s in ipairs({ 1, -1 }) do
+						ctx:tube(spine, { { 0.1 * s, y, -0.5 }, { 0.62 * s, y - 0.05, -0.36 }, { 0.84 * s, y - 0.12, 0.0 },
+							{ 0.6 * s, y - 0.18, 0.4 } }, { 0.07, 0.065, 0.06, 0.05 }, "SkinLight")
+					end
+				end
+				for i = 0, 6 do
+					ctx:blob(spine, { 0, 0.3 + i * 0.27, 0.46 }, { 0.2, 0.16, 0.16 }, nil, "SkinLight")
+				end
+				for _, s in ipairs({ 1, -1 }) do
+					ctx:tube(spine, { { 0.08 * s, 1.95, -0.38 }, { 0.8 * s, 2.02, -0.1 } }, { 0.08, 0.07 }, "SkinLight")
+					ctx:blob(spine, { 0.66 * s, 0.15, -0.28 }, { 0.3, 0.35, 0.25 }, nil, "SkinLight")
+				end
+				A.torsoSockets(ctx, spine, { front = 0.52, back = 0.5, width = 0.88, top = 2.0, bellyFront = 0.35 })
+			end)
+			A.pelvisAndNeck(ctx, { pelvisRole = "SkinDark" })
+		end,
+	})
+
+	-- The reference creature's torso: hump, neck wraps, exposed ribbed flesh on the front.
+	torso({
+		id = "HunchedTorso",
+		grade = "Grade3",
+		tags = { "hunched", "reference" },
+		params = { fleshFront = true },
+		build = function(ctx, params)
+			local spine = A.spine(ctx)
+			local sh = ctx:m("Shoulder") / 1.3
+			-- authored at the Hunched body type's mass; normalize so it scales from there
+			ctx:with({ scale = A.torsoScale(ctx, 0.8, 0.95, 0.8) }, function()
+				ctx:blob(spine, { 0, 1.75, 0.4 }, { 2.8, 2.6, 2.3 }, { -2, 0, 0 }, "Skin")
+				ctx:blob(spine, { 0.1, 2.4, 0.35 }, { 2.2, 1.3, 1.8 }, { -6, 0, 5 }, "SkinLight")
+				ctx:blob(spine, { -0.3, 2.05, 0.95 }, { 1.6, 0.3, 1.2 }, { -14, 0, 10 }, "SkinDark")
+				for _, s in ipairs({ 1, -1 }) do
+					ctx:blob(spine, { 1.2 * s, 1.6, -0.15 }, { 1.45 * sh, 1.5 * sh, 1.8 }, { 0, 0, 22 * s }, "Skin")
+					ctx:blob(spine, { 1.25 * s, 2.0, 0.1 }, { 1.0 * sh, 0.32, 1.4 }, { -10, 0, 30 * s }, "SkinLight")
+					ctx:blob(spine, { 0.72 * s, 1.75, -0.7 }, { 1.1, 0.95, 1.15 }, { -20, 0, 30 * s }, "Skin")
+					ctx:blob(spine, { 0.95 * s, 0.7, 0.15 }, { 0.7, 1.5, 1.2 }, { 0, 0, 5 * s }, "Skin")
+				end
+				if params.fleshFront then
+					ctx:blob(spine, { 0.05, 1.1, -0.35 }, { 2.35, 2.0, 1.4 }, nil, "Flesh")
+					ctx:blob(spine, { 0, 0.3, -0.3 }, { 2.0, 1.1, 1.3 }, nil, "Flesh")
+					for _, s in ipairs({ 1, -1 }) do
+						ctx:blob(spine, { 0.7 * s, 1.45, -0.75 }, { 1.0, 1.1, 0.65 }, { 0, 0, -10 * s }, "Flesh")
+						for j, y in ipairs({ 1.75, 1.48, 1.21, 0.94 }) do
+							ctx:blob(spine, { 0.78 * s, y, -0.98 }, { 0.6, 0.1, 0.22 }, { 0, 12 * s, (-12 + j * 3) * s }, "FleshDark")
+						end
+					end
+					for j, y in ipairs({ 0.45, 0.2, -0.05 }) do
+						ctx:blob(spine, { 0, y, -0.93 + j * 0.03 }, { 1.45 - j * 0.12, 0.09, 0.3 }, nil, "FleshDark")
+					end
+				end
+				A.torsoSockets(ctx, spine, { front = 1.0, back = 1.4, width = 1.3, top = 2.9, chestY = 1.2 })
+			end)
+			A.pelvisAndNeck(ctx)
+			if params.fleshFront then
+				ctx:with({ scale = Vector3.one }, function()
+					ctx:blob("Torso", { 0, -1.1, -0.28 }, { 1.1, 0.7, 1.0 }, nil, "Flesh")
+				end)
+			end
+		end,
+	})
+
+	torso({
+		id = "WideTorso",
+		grade = "Grade3",
+		tags = { "heavy" },
+		build = function(ctx)
+			local spine = A.spine(ctx)
+			ctx:with({ scale = A.torsoScale(ctx, 1.25, 1, 1.15) }, function()
+				ctx:blob(spine, { 0, 1.35, 0 }, { 2.6, 1.55, 1.35 }, nil, "Skin")
+				ctx:blob(spine, { 0, 2.0, 0.1 }, { 2.2, 0.8, 1.1 }, nil, "SkinLight")
+				ctx:blob(spine, { 0, 0.65, -0.1 }, { 2.2, 1.25, 1.3 }, nil, "Skin")
+				ctx:blob(spine, { 0, 0.6, -0.55 }, { 1.4, 0.8, 0.5 }, nil, "SkinLight")
+				for _, s in ipairs({ 1, -1 }) do
+					ctx:blob(spine, { 0.55 * s, 1.55, -0.5 }, { 1.1, 0.75, 0.5 }, nil, "SkinLight")
+					ctx:blob(spine, { 1.1 * s, 1.5, 0.05 }, { 0.8, 1.3, 1.1 }, { 0, 0, 12 * s }, "Skin")
+				end
+				A.torsoSockets(ctx, spine, { front = 0.72, back = 0.7, width = 1.25, top = 2.2 })
+			end)
+			A.pelvisAndNeck(ctx)
+		end,
+	})
+
+	torso({
+		id = "RibbedTorso",
+		grade = "Grade2",
+		tags = { "bone", "hollow" },
+		build = function(ctx)
+			local spine = A.spine(ctx)
+			ctx:with({ scale = A.torsoScale(ctx, 0.95, 1, 0.95) }, function()
+				ctx:blob(spine, { 0, 1.2, 0.05 }, { 1.35, 1.6, 0.85 }, nil, "Void")
+				ctx:tube(spine, { { 0, 0.1, 0.35 }, { 0, 1.0, 0.42 }, { 0, 2.0, 0.3 } }, { 0.16, 0.15, 0.14 }, "Bone")
+				for i = 0, 7 do
+					ctx:blob(spine, { 0, 0.2 + i * 0.25, 0.5 }, { 0.26, 0.14, 0.22 }, nil, "BoneDark")
+				end
+				for i = 1, 6 do
+					local y = 1.9 - i * 0.22
+					for _, s in ipairs({ 1, -1 }) do
+						ctx:tube(spine, { { 0.08 * s, y, 0.38 }, { 0.72 * s, y - 0.04, 0.18 }, { 0.86 * s, y - 0.12, -0.25 },
+							{ 0.3 * s, y - 0.22, -0.56 } }, { 0.08, 0.075, 0.07, 0.06 }, "Bone")
+					end
+				end
+				ctx:tube(spine, { { 0, 1.85, -0.58 }, { 0, 0.95, -0.55 } }, { 0.1, 0.08 }, "Bone")
+				for _, s in ipairs({ 1, -1 }) do
+					ctx:blob(spine, { 0.85 * s, 1.95, 0 }, { 0.95, 0.7, 1.0 }, { 0, 0, 20 * s }, "SkinDark")
+				end
+				ctx:blob(spine, { 0, 0.25, 0 }, { 1.5, 0.6, 0.9 }, nil, "SkinDark")
+				A.torsoSockets(ctx, spine, { front = 0.6, back = 0.58, width = 0.95 })
+			end)
+			A.pelvisAndNeck(ctx, { pelvisRole = "SkinDark", neckRole = "SkinDark" })
+		end,
+	})
+
+	-- Special Grade: the torso stops being a torso — a swollen orb of flesh.
+	torso({
+		id = "OrbTorso",
+		grade = "SpecialGrade",
+		tags = { "abnormal" },
+		build = function(ctx)
+			local spine = A.spine(ctx)
+			ctx:with({ scale = A.torsoScale(ctx, 0.75, 0.8, 0.75) }, function()
+				ctx:blob(spine, { 0, 1.25, 0.05 }, { 2.9, 2.7, 2.6 }, nil, "Skin")
+				for i = 1, 5 do
+					local a = i * 72
+					ctx:blob(spine, { 0, 1.25, 0.05 }, { 2.95, 0.08, 2.65 }, { a * 0.4, a, 0 }, "SkinDark")
+				end
+				ctx:blob(spine, { 0, 2.35, 0.1 }, { 1.6, 0.8, 1.5 }, nil, "SkinLight")
+				A.torsoSockets(ctx, spine, { front = 1.25, back = 1.3, width = 1.4, top = 2.55, chestY = 1.35 })
+			end)
+			A.pelvisAndNeck(ctx)
+		end,
+	})
+end
+]]></ProtectedString></Properties></Item><Item class="ModuleScript" referent="RBX9"><Properties><string name="Name">Transformations</string><ProtectedString name="Source"><![CDATA[--!nonstrict
+--[[
+	Transformations: named Partial / Full stages, each a partial appearance override.
+	  plain value           replaces the slot            Head = "SplitJawHead"
+	  { add = …, remove = … }  edits a multi/limb slot    ExtraArms = { add = 2 }
+	  Scales = { … }        multiplies                    Scales = { Arms = 1.2 }
+	  Layout = { … }        adds to posture               Layout = { hunch = 10 }
+	  Height = { mul = x }  multiplies height
+	Full inherits Partial unless Full.inherit == false. Grades cap which stage is usable.
+]]
+
+return {
+	{
+		id = "SplitMaw",
+		grade = "Grade3",
+		description = "The head splits open into a maw; at full power the chest tears open too.",
+		stages = {
+			Partial = { Head = "SplitJawHead", Layout = { hunch = 6 } },
+			Full = {
+				TorsoGrowths = { add = { "OpenChest" } },
+				Mouths = { add = { { id = "Maw", socket = "Belly", params = { size = 0.45 } } } },
+				Layout = { hunch = 6 },
+			},
+		},
+	},
+	{
+		id = "FourArms",
+		grade = "Grade3",
+		description = "A second pair of arms tears out of the flanks.",
+		stages = {
+			Partial = { ExtraArms = { add = 1 } },
+			Full = { ExtraArms = { add = 1 }, Scales = { Arms = 1.15, Shoulders = 1.2 } },
+		},
+	},
+	{
+		id = "OpenChest",
+		grade = "Grade3",
+		description = "The torso opens and reveals a black cavity, then its organs.",
+		stages = {
+			Partial = { TorsoGrowths = { add = { "ChestCavity" } } },
+			Full = { TorsoGrowths = { remove = { "ChestCavity" }, add = { "ExposedOrgans", "RibGrowth" } } },
+		},
+	},
+	{
+		id = "BladeForm",
+		grade = "Grade2",
+		description = "Fingers harden into blades; a bladed tail and spines follow.",
+		stages = {
+			Partial = { Hands = "BladedFingers" },
+			Full = { Tails = { add = { "BladeTail" } }, Back = { add = { "Spikes" } } },
+		},
+	},
+	{
+		id = "Hive",
+		grade = "Grade2",
+		description = "Eyes open across the body.",
+		stages = {
+			Partial = { Eyes = { add = { { id = "EyeCluster", socket = "ChestR", params = { count = 3 } } } } },
+			Full = {
+				Eyes = { add = { { id = "EyeCluster", socket = "ChestL", params = { count = 3 } } } },
+				Back = { add = { "BackEyes" } },
+			},
+		},
+	},
+	{
+		id = "MonstrousSurge",
+		grade = "Grade1",
+		description = "Mass floods the body: bigger frame, massive horns, bone wings.",
+		stages = {
+			Partial = { Scales = { Torso = 1.12, Arms = 1.2, Hands = 1.2, Shoulders = 1.2 }, Layout = { hunch = 6 } },
+			Full = {
+				BodyType = "Monstrous",
+				Height = { mul = 1.2 },
+				Horns = { remove = "all", add = { { id = "MassiveHorn", socket = "TopR" }, { id = "MassiveHorn", socket = "TopL" } } },
+				Back = { add = { "BoneWings" } },
+			},
+		},
+	},
+	{
+		id = "Unravel",
+		grade = "SpecialGrade",
+		description = "The body comes apart into something that was never human.",
+		stages = {
+			Partial = { ExtraArms = { add = 2 }, Back = { add = { "Tendrils" } } },
+			Full = {
+				Legs = "SerpentBody",
+				ExtraHeads = { add = 2 },
+				ExtraArms = { add = 2 },
+				Eyes = { add = { { id = "EyeCluster", socket = "Belly", params = { count = 6 } } } },
+			},
+		},
+	},
+}
+]]></ProtectedString></Properties></Item><Item class="ModuleScript" referent="RBX10"><Properties><string name="Name">_Anatomy</string><ProtectedString name="Source"><![CDATA[--!nonstrict
+-- Shared anatomy helpers for catalog builders (not auto-registered: name starts with "_").
+
+local A = {}
+
+A.FRONT = { -90, 0, 0 }
+A.BACK = { 90, 0, 0 }
+A.RIGHT = { 0, 0, -90 }
+A.UP = { 0, 0, 0 }
+A.DOWN = { 180, 0, 0 }
+
+-- torso "spine" anchor: origin at the pelvis, leaned forward by the body's hunch
+function A.spine(ctx)
+	return ctx:anchor("Torso", ctx.layout.spine)
+end
+
+function A.torsoScale(ctx, w, h, d)
+	return Vector3.new(ctx:m("TorsoW") * (w or 1), ctx:m("TorsoH") * (h or 1), ctx:m("TorsoD") * (d or 1))
+end
+
+--[[
+	Define the torso sockets on a torso's actual surface (spine space, current scale).
+	s.front / s.back = surface depth, s.width = flank x, s.top = shoulder-top y
+]]
+function A.torsoSockets(ctx, spine, s)
+	local front, back, width, top = s.front or 0.6, s.back or 0.6, s.width or 1.0, s.top or 2.05
+	ctx:defineSocket("Chest", spine, { 0, s.chestY or 1.45, -front }, A.FRONT)
+	ctx:defineSocketPair("Chest", spine, { 0.5 * width, 1.5, -front * 0.92 }, { -90, 0, 0 })
+	ctx:defineSocket("Belly", spine, { 0, s.bellyY or 0.7, -(s.bellyFront or front * 0.95) }, A.FRONT)
+	ctx:defineSocketPair("ChestLow", spine, { 0.62 * width, 0.95, -front * 0.8 }, { -90, 0, 0 })
+	ctx:defineSocket("UpperBack", spine, { 0, 1.6, back }, A.BACK)
+	ctx:defineSocket("Back", spine, { 0, 1.1, back * 0.95 }, A.BACK)
+	ctx:defineSocketPair("Back", spine, { 0.55 * width, 1.45, back * 0.9 }, A.BACK)
+	ctx:defineSocket("LowerBack", spine, { 0, 0.45, back * 0.85 }, A.BACK)
+	ctx:defineSocketPair("Flank", spine, { width, 1.0, 0 }, A.RIGHT)
+	ctx:defineSocketPair("Shoulder", spine, { 0.8 * width, top, 0 }, A.UP)
+	ctx:defineSocket("Neck", spine, { 0, top - 0.05, 0.1 }, A.UP)
+end
+
+-- pelvis + neck + tail root/hip sockets (on the Torso itself; they do not lean)
+function A.pelvisAndNeck(ctx, opts)
+	opts = opts or {}
+	local W, D = ctx:m("TorsoW"), ctx:m("TorsoD")
+	local neck = ctx.layout.neck
+	local nm = ctx:m("Neck")
+	ctx:with({ scale = Vector3.one }, function()
+		ctx:blob("Torso", { 0, -0.72, 0.02 }, { 1.95 * W, 0.9, 1.15 * D }, { 6, 0, 0 }, opts.pelvisRole or "Skin")
+		ctx:blob("Torso", { neck.X, neck.Y - 0.1, neck.Z + 0.12 }, { 0.95 * nm, 1.0, 0.9 * nm }, { -10, 0, 0 },
+			opts.neckRole or "Skin")
+		ctx:defineSocket("TailRoot", "Torso", { 0, -0.85, 0.5 * D }, A.BACK)
+		ctx:defineSocketPair("Hip", "Torso", { 0.95 * W, -0.8, 0 }, A.RIGHT)
+	end)
+end
+
+-- side of an entry: explicit entry.side, else from its socket name (…R / …_R), else Right
+function A.sideOf(entry)
+	if entry.side == "Left" or entry.side == -1 then
+		return "Left"
+	elseif entry.side == "Right" or entry.side == 1 then
+		return "Right"
+	end
+	local socket = entry.socket or ""
+	if string.match(socket, "L$") then
+		return "Left"
+	end
+	return "Right"
+end
+
+-- evenly spread points on a disc (socket space, +Y out of the surface), seeded
+function A.scatter(ctx, count, radius)
+	local out = {}
+	for i = 1, count do
+		local a = i * 2.39996 + ctx:rand(-0.3, 0.3)
+		local r = radius * math.sqrt((i - 0.5) / count)
+		table.insert(out, { math.cos(a) * r, 0, math.sin(a) * r })
+	end
+	return out
+end
+
+-- rotate a {x,y,z} vector about the X then Z axes (degrees)
+function A.rot(v, rx, rz)
+	local x, y, z = v[1], v[2], v[3]
+	local a = math.rad(rx or 0)
+	y, z = y * math.cos(a) - z * math.sin(a), y * math.sin(a) + z * math.cos(a)
+	local b = math.rad(rz or 0)
+	x, y = x * math.cos(b) - y * math.sin(b), x * math.sin(b) + y * math.cos(b)
+	return { x, y, z }
+end
+
+function A.add(a, b, k)
+	k = k or 1
+	return { a[1] + b[1] * k, a[2] + b[2] * k, a[3] + b[3] * k }
+end
+
+function A.lerp(a, b, t)
+	return { a[1] + (b[1] - a[1]) * t, a[2] + (b[2] - a[2]) * t, a[3] + (b[3] - a[3]) * t }
+end
+
+-- the anchor a multi-slot entry was placed at (socket + offset); falls back to a socket
+function A.at(ctx, fallbackSocket)
+	return ctx.at or ctx:socket(fallbackSocket or "Chest")
+end
+
+return A
+]]></ProtectedString></Properties></Item></Item><Item class="ModuleScript" referent="RBX12"><Properties><string name="Name">Grades</string><ProtectedString name="Source"><![CDATA[--!nonstrict
+--[[
+	Curse grades. The grade is progression (cursed energy, feats, level), NOT a count
+	of cosmetic parts: `Grades.compute` reads the profile's stats, and anatomy only
+	ever reads the grade. Higher grades unlock more of the catalog and larger caps.
+]]
+
+local Grades = {}
+
+Grades.order = { "Grade4", "Grade3", "Grade2", "Grade1", "SpecialGrade" }
+Grades.index = {}
+for i, name in ipairs(Grades.order) do
+	Grades.index[name] = i
+end
+
+Grades.displayName = {
+	Grade4 = "Grade 4",
+	Grade3 = "Grade 3",
+	Grade2 = "Grade 2",
+	Grade1 = "Grade 1",
+	SpecialGrade = "Special Grade",
+}
+
+--            Grade4  Grade3  Grade2  Grade1  Special
+local CAPS = {
+	Horns = { 2, 3, 4, 6, 12 },
+	Eyes = { 2, 4, 8, 16, 40 },
+	Mouths = { 1, 2, 3, 5, 12 },
+	HeadGrowths = { 1, 2, 4, 6, 12 },
+	TorsoGrowths = { 1, 2, 3, 5, 10 },
+	ExtraArms = { 0, 1, 2, 4, 8 },
+	ExtraLegs = { 0, 0, 2, 4, 6 },
+	ExtraHeads = { 0, 0, 0, 1, 4 },
+	Tails = { 1, 1, 2, 3, 6 },
+	Back = { 0, 1, 2, 4, 8 },
+	Disfigurements = { 2, 4, 8, 14, 30 },
+	-- max deviation of Appearance.Scales from 1
+	ScaleRange = { 0.10, 0.20, 0.35, 0.60, 1.00 },
+	HeightMin = { 0.90, 0.85, 0.80, 0.75, 0.60 },
+	HeightMax = { 1.10, 1.20, 1.35, 1.60, 2.20 },
+	-- 0 = no transformation, 1 = Partial, 2 = Full
+	MaxFormStage = { 0, 1, 1, 2, 2 },
+}
+
+Grades.bodyTypes = {
+	Grade4 = { "Lean", "Normal", "Muscular" },
+	Grade3 = { "Hunched", "Heavy" },
+	Grade2 = { "Deformed" },
+	Grade1 = { "Monstrous" },
+	SpecialGrade = { "Massive" },
+}
+
+Grades.formStages = { Base = 0, Partial = 1, Full = 2 }
+
+function Grades.valid(grade)
+	return Grades.index[grade] ~= nil
+end
+
+function Grades.rank(grade)
+	return Grades.index[grade] or 1
+end
+
+function Grades.atLeast(grade, minimum)
+	return Grades.rank(grade) >= Grades.rank(minimum or "Grade4")
+end
+
+function Grades.cap(grade, key)
+	local row = CAPS[key]
+	return row and row[Grades.rank(grade)] or math.huge
+end
+
+function Grades.bodyTypeAllowed(grade, bodyType)
+	for i = 1, Grades.rank(grade) do
+		for _, name in ipairs(Grades.bodyTypes[Grades.order[i]]) do
+			if name == bodyType then
+				return true
+			end
+		end
+	end
+	return false
+end
+
+function Grades.formAllowed(grade, stage)
+	return (Grades.formStages[stage] or 99) <= Grades.cap(grade, "MaxFormStage")
+end
+
+--[[
+	Replace with your game's progression. Stats are whatever the profile tracks;
+	the default uses cursed energy and exorcisms/kills.
+]]
+Grades.thresholds = {
+	{ grade = "SpecialGrade", cursedEnergy = 50000, feats = 500 },
+	{ grade = "Grade1", cursedEnergy = 15000, feats = 150 },
+	{ grade = "Grade2", cursedEnergy = 5000, feats = 50 },
+	{ grade = "Grade3", cursedEnergy = 1000, feats = 10 },
+}
+
+function Grades.compute(profile)
+	local stats = profile and profile.Stats or {}
+	local ce, feats = stats.CursedEnergy or 0, stats.Feats or 0
+	for _, t in ipairs(Grades.thresholds) do
+		if ce >= t.cursedEnergy and feats >= t.feats then
+			return t.grade
+		end
+	end
+	return "Grade4"
+end
+
+return Grades
+]]></ProtectedString></Properties></Item><Item class="ModuleScript" referent="RBX13"><Properties><string name="Name">Palettes</string><ProtectedString name="Source"><![CDATA[--!nonstrict
+--[[
+	Palettes map material ROLES to colors/materials. Components only ever ask for a
+	role ("Skin", "Bone", "Void" …), so every part recolors per Curse.
+
+	Appearance.Palette is either a palette name or a table of role → "#RRGGBB"
+	(or { color = "#RRGGBB", material = "Slate", transparency = 0.2 }) layered over
+	`base` (default Crimson).
+]]
+
+local Palettes = {}
+
+Palettes.roles = {
+	"Skin", "SkinLight", "SkinDark", "SkinDeep", "Flesh", "FleshDark", "Bone", "BoneDark",
+	"Void", "VoidRim", "Eye", "Pupil", "Claw", "Teeth", "Membrane", "Spot", "Glow",
+}
+
+local MATERIALS = {
+	Eye = "Neon", Glow = "Neon", Void = "Slate", VoidRim = "Slate",
+}
+local TRANSPARENCY = { Membrane = 0.15 }
+
+Palettes.defs = {
+	Crimson = { -- the reference creature
+		Skin = "#942028", SkinLight = "#AC3238", SkinDark = "#68141C", SkinDeep = "#3A0A10",
+		Flesh = "#CCBA96", FleshDark = "#9E8866", Bone = "#DDD3BC", BoneDark = "#A89C84",
+		Void = "#0A0808", VoidRim = "#2E1C1A", Eye = "#E4E2D6", Pupil = "#140A0A",
+		Claw = "#1C1414", Teeth = "#E8E0CC", Membrane = "#5A1218", Spot = "#240810", Glow = "#FF5A3C",
+	},
+	Pale = {
+		Skin = "#D9D4CB", SkinLight = "#EEEAE2", SkinDark = "#A8A198", SkinDeep = "#6E675F",
+		Flesh = "#C99A92", FleshDark = "#94645E", Bone = "#F2EEE4", BoneDark = "#BDB6A6",
+		Void = "#0C0A0C", VoidRim = "#3A3033", Eye = "#1A1A1A", Pupil = "#FFFFFF",
+		Claw = "#2A2626", Teeth = "#FAF6EA", Membrane = "#B8B0A6", Spot = "#8C847A", Glow = "#9FE8FF",
+	},
+	Ash = {
+		Skin = "#4A4648", SkinLight = "#625D60", SkinDark = "#2E2B2D", SkinDeep = "#161415",
+		Flesh = "#8A7D74", FleshDark = "#5E534C", Bone = "#BEB7AA", BoneDark = "#857E72",
+		Void = "#050505", VoidRim = "#1E1A1A", Eye = "#FFD24A", Pupil = "#0A0A0A",
+		Claw = "#0E0E0E", Teeth = "#CFC8B8", Membrane = "#2A2628", Spot = "#1A1819", Glow = "#FFB020",
+	},
+	Bruise = {
+		Skin = "#5E3A6E", SkinLight = "#7A5088", SkinDark = "#3E2248", SkinDeep = "#20102A",
+		Flesh = "#C49AA8", FleshDark = "#8E6272", Bone = "#E2D8CC", BoneDark = "#A89C90",
+		Void = "#08050A", VoidRim = "#2A1830", Eye = "#E8F070", Pupil = "#140A14",
+		Claw = "#1A1020", Teeth = "#EDE4D0", Membrane = "#4A2A56", Spot = "#2A1434", Glow = "#C070FF",
+	},
+	Bile = {
+		Skin = "#7A8440", SkinLight = "#949E56", SkinDark = "#525A28", SkinDeep = "#2C3014",
+		Flesh = "#D2C68A", FleshDark = "#A09660", Bone = "#E6DEBE", BoneDark = "#ACA484",
+		Void = "#0A0A04", VoidRim = "#2A2A14", Eye = "#F0F0E0", Pupil = "#101008",
+		Claw = "#1E1E10", Teeth = "#EEE6C8", Membrane = "#5A6230", Spot = "#3A4018", Glow = "#B8FF3C",
+	},
+	Void = {
+		Skin = "#141216", SkinLight = "#221E26", SkinDark = "#0A090B", SkinDeep = "#040404",
+		Flesh = "#3A3240", FleshDark = "#241E28", Bone = "#D8D2E0", BoneDark = "#8E8698",
+		Void = "#000000", VoidRim = "#16101A", Eye = "#FF2A2A", Pupil = "#000000",
+		Claw = "#E6E0EA", Teeth = "#F0EAF4", Membrane = "#0E0C10", Spot = "#2A2230", Glow = "#FF2A2A",
+	},
+	Flayed = {
+		Skin = "#B8525A", SkinLight = "#D06E72", SkinDark = "#86343C", SkinDeep = "#4E1A20",
+		Flesh = "#E8B4A4", FleshDark = "#B47C70", Bone = "#F0E6D2", BoneDark = "#B8AA92",
+		Void = "#100606", VoidRim = "#3E1616", Eye = "#F8F4E8", Pupil = "#1A0A0A",
+		Claw = "#2A1414", Teeth = "#F4ECD8", Membrane = "#9A3E46", Spot = "#5A2026", Glow = "#FF8A5A",
+	},
+}
+
+local function toColor(value)
+	if typeof(value) == "Color3" then
+		return value
+	end
+	return Color3.fromHex(value)
+end
+
+function Palettes.exists(name)
+	return Palettes.defs[name] ~= nil
+end
+
+-- Returns role → { Color = Color3, Material = Enum.Material, Transparency = number }
+function Palettes.resolve(palette)
+	local base = Palettes.defs.Crimson
+	local custom = {}
+	if type(palette) == "string" then
+		base = Palettes.defs[palette] or base
+	elseif type(palette) == "table" then
+		base = Palettes.defs[palette.base] or base
+		custom = palette
+	end
+	local out = {}
+	for _, role in ipairs(Palettes.roles) do
+		local entry = custom[role]
+		local color, material, transparency = base[role], MATERIALS[role] or "SmoothPlastic", TRANSPARENCY[role] or 0
+		if type(entry) == "string" then
+			color = entry
+		elseif type(entry) == "table" then
+			color = entry.color or color
+			material = entry.material or material
+			transparency = entry.transparency or transparency
+		end
+		local ok, c = pcall(toColor, color)
+		local okMaterial, enumMaterial = pcall(function()
+			return Enum.Material[material]
+		end)
+		out[role] = {
+			Color = ok and c or Color3.new(1, 0, 1),
+			Material = okMaterial and enumMaterial or Enum.Material.SmoothPlastic,
+			Transparency = transparency,
+		}
+	end
+	return out
+end
+
+function Palettes.valid(palette)
+	if type(palette) == "string" then
+		return Palettes.defs[palette] ~= nil
+	end
+	return type(palette) == "table"
+end
+
+return Palettes
+]]></ProtectedString></Properties></Item><Item class="ModuleScript" referent="RBX14"><Properties><string name="Name">Presets</string><ProtectedString name="Source"><![CDATA[--!nonstrict
+--[[
+	Example Curses. Each is just an appearance table: the same system, the same R6 rig,
+	radically different bodies. Use them as starting points or NPC templates:
+
+	  local p = CurseBody.Presets.CrimsonHusk
+	  CurseBody.apply(character, p.appearance, { grade = p.grade })
+]]
+
+return {
+	-- The reference creature, rebuilt from modular parts.
+	CrimsonHusk = {
+		grade = "Grade2",
+		description = "Hunched crimson husk: octopoid head, black chest cavity, heavy fists, clawed tail.",
+		appearance = {
+			Seed = 7,
+			BodyType = "Hunched",
+			Palette = "Crimson",
+			Height = 1.3,
+			Head = "OctopoidHead",
+			Torso = "HunchedTorso",
+			TorsoGrowths = { { id = "ChestCavity", socket = "Chest", pos = { -0.12, 0, 0.1 } } },
+			Arms = "HeavyArm",
+			Hands = "Fist",
+			Legs = "HuskLeg",
+			Feet = "EnlargedFoot",
+			Tails = { "CreatureTail" },
+			Transformation = "SplitMaw",
+		},
+	},
+
+	-- humanoid, skinny, horned, pale, one-eyed
+	PaleSeer = {
+		grade = "Grade3",
+		description = "Gaunt pale humanoid with a single giant eye and a pair of horns.",
+		appearance = {
+			Seed = 21,
+			BodyType = "Lean",
+			Palette = "Pale",
+			Height = 1.1,
+			Head = "HumanCurseHead",
+			Eyes = { { id = "GiantEye", socket = "Face", pos = { 0, 0, 0.1 } } },
+			Mouths = { "SlitMouth" },
+			Horns = { "HornPair" },
+			Torso = "EmaciatedTorso",
+			Arms = "ThinArm",
+			Hands = "ClawedHand",
+			Legs = "ThinLeg",
+			Feet = "Foot",
+			Disfigurements = { { id = "MissingFingers", socket = "Hand_L" } },
+			Transformation = "OpenChest",
+		},
+	},
+
+	-- enormous, muscular, hunched, four-armed, red, covered in eyes, with a tail
+	Behemoth = {
+		grade = "Grade1",
+		description = "Four-armed red mountain of muscle covered in eyes.",
+		appearance = {
+			Seed = 3,
+			BodyType = "Monstrous",
+			Palette = "Flayed",
+			Height = 1.35,
+			Head = "SmallHead",
+			Eyes = {
+				{ id = "EyeCluster", socket = "Face", params = { count = 5, spread = 0.25 } },
+				{ id = "EyeCluster", socket = "ChestR", params = { count = 4 } },
+				{ id = "EyeCluster", socket = "ChestL", params = { count = 4 } },
+				{ id = "Eye", socket = "UpperArm_R", scale = 1.6 },
+				{ id = "Eye", socket = "UpperArm_L", scale = 1.6 },
+			},
+			Mouths = { { id = "GrinMouth", socket = "Belly", params = { width = 1.1 } } },
+			Horns = { "DemonHorns" },
+			Torso = "MuscularTorso",
+			TorsoGrowths = { "BonePlating" },
+			Arms = "MuscularArm",
+			Hands = "ClawedHand",
+			ExtraArms = 2,
+			Legs = "MassiveLeg",
+			Feet = "ClawedFoot",
+			Tails = { "ThickTail" },
+			Transformation = "MonstrousSurge",
+		},
+	},
+
+	-- insectoid, extremely thin, long-limbed, multiple-jawed, winged
+	Mantis = {
+		grade = "Grade1",
+		description = "Emaciated insect with scythe arms, stacked jaws and membrane wings.",
+		appearance = {
+			Seed = 11,
+			BodyType = "Lean",
+			Palette = "Bile",
+			Height = 1.25,
+			Scales = { ArmLength = 1.3, Legs = 0.9 },
+			Head = "MandibleHead",
+			Mouths = { "Mandibles", { id = "HangingJaw", socket = "Jaw" } },
+			HeadGrowths = { "Antennae" },
+			Torso = "EmaciatedTorso",
+			TorsoGrowths = { "OrganicArmor" },
+			Arms = "ScytheArm",
+			ExtraArms = { { id = "ThinArm", hand = "TalonHand" } },
+			Legs = "DigitigradeLeg",
+			Feet = "TalonFoot",
+			ExtraLegs = { { id = "InsectLeg" }, { id = "InsectLeg" } },
+			Back = { "Wings" },
+			Transformation = "BladeForm",
+		},
+	},
+
+	-- a fresh Grade 4 curse: barely more than a disfigured person
+	Grub = {
+		grade = "Grade4",
+		description = "Newborn curse: one missing eye, a stub horn and a growth on the shoulder.",
+		appearance = {
+			Seed = 5,
+			BodyType = "Normal",
+			Palette = "Ash",
+			Head = "HumanCurseHead",
+			Eyes = { { id = "Eye", socket = "EyeR" }, { id = "MissingEye", socket = "EyeL" } },
+			Mouths = { { id = "SlitMouth", rot = { 0, 0, -8 } } },
+			Horns = { { id = "StubHorn", socket = "TopL" } },
+			Torso = "NormalTorso",
+			Arms = { Right = "NormalArm", Left = "ThinArm" },
+			Hands = "Hand",
+			Legs = "NormalLeg",
+			Feet = "Foot",
+			Disfigurements = { { id = "Tumor", socket = "ShoulderR", params = { size = 0.3 } } },
+		},
+	},
+
+	Hollow = {
+		grade = "Grade2",
+		description = "Skull-headed, hollow-ribbed thing on reversed legs and hooves.",
+		appearance = {
+			Seed = 17,
+			BodyType = "Deformed",
+			Palette = "Bruise",
+			Head = "SkullHead",
+			Horns = { "Antlers" },
+			Torso = "RibbedTorso",
+			Arms = "BoneArm",
+			Hands = "TalonHand",
+			Legs = "ReverseJointLeg",
+			Feet = "HoofFoot",
+			Back = { "Spikes" },
+			Tails = { "BoneTail" },
+			Disfigurements = { { id = "CrackedFlesh", socket = "Belly" }, { id = "ExposedBone", socket = "UpperArm_L" } },
+		},
+	},
+
+	-- Special Grade: anatomy that no longer resembles a person
+	Amalgam = {
+		grade = "SpecialGrade",
+		description = "Serpent-bodied amalgam of heads, arms and eyes.",
+		appearance = {
+			Seed = 42,
+			BodyType = "Massive",
+			-- custom palette: Void base with lifted skin values and a sickly glow
+			Palette = { base = "Void", Skin = "#2E2735", SkinLight = "#453A50", SkinDark = "#1C1722", Glow = "#9CFF4A", Eye = "#E8FF9A" },
+			Height = 1.4,
+			Head = "OversizedHead",
+			Eyes = {
+				{ id = "GiantEye", socket = "Face", scale = 0.8 },
+				{ id = "EyeCluster", socket = "Chest", params = { count = 8, spread = 0.6 } },
+				{ id = "EyeStalk", socket = "Crown" },
+				{ id = "EyeStalk", socket = "TopL", params = { length = 1.2 } },
+			},
+			Mouths = { { id = "LampreyMouth", socket = "Belly" }, { id = "GrinMouth", socket = "Palm_R", scale = 0.6 } },
+			Horns = { "CrownOfHorns" },
+			Torso = "OrbTorso",
+			Arms = { Right = "MultiJointArm", Left = "TentacleArm" },
+			Hands = "BladedFingers",
+			ExtraArms = {
+				{ id = "TentacleArm", socket = "FlankR" }, { id = "TentacleArm", socket = "FlankL" },
+				{ id = "BoneArm", hand = "TalonHand", socket = "BackR" }, { id = "BoneArm", hand = "TalonHand", socket = "BackL" },
+			},
+			ExtraHeads = { { id = "SkullHead", socket = "ShoulderR" }, { id = "FacelessHead", socket = "ShoulderL", Eyes = { { id = "GiantEye", socket = "Face" } } } },
+			Legs = "SerpentBody",
+			Back = { "BoneWings", "Tendrils" },
+			Disfigurements = { { id = "CrackedFlesh", socket = "Back" } },
+			Transformation = "Unravel",
+		},
+	},
+}
+]]></ProtectedString></Properties></Item><Item class="ModuleScript" referent="RBX15"><Properties><string name="Name">Registry</string><ProtectedString name="Source"><![CDATA[--!nonstrict
+--[[
+	Component registry. Every body part, horn, growth and transformation is a
+	table registered here; the core never hardcodes a component.
+
+	Component fields
+	  id        unique string
+	  slots     list of slot names that accept it
+	  grade     minimum grade (default "Grade4")
+	  tags      free-form list (for UI filters)
+	  params    default parameters (overridable per appearance entry)
+	  defaults  (heads) default Eyes/Mouths/HeadGrowths when the appearance leaves them nil
+	  count     number or function(params) → how many units it uses against the slot cap
+	  build     function(ctx, params, entry)   – creates geometry
+	  mutate    function(body, params, entry)  – optional, changes proportions before building
+
+	Catalog modules return an array of component tables, or a function(Registry).
+	Modules whose name starts with "_" are helpers and are not auto-loaded.
+]]
+
+local Grades = require(script.Parent.Grades)
+local Slots = require(script.Parent.Slots)
+
+local Registry = {}
+
+local components = {}
+local transformations = {}
+local loaded = false
+
+function Registry.register(def)
+	assert(type(def) == "table" and type(def.id) == "string", "component needs an id")
+	assert(type(def.slots) == "table" and #def.slots > 0, def.id .. ": component needs slots")
+	for _, slotName in ipairs(def.slots) do
+		assert(Slots.get(slotName), def.id .. ": unknown slot " .. tostring(slotName))
+	end
+	assert(def.build or def.mutate, def.id .. ": component needs build or mutate")
+	def.grade = def.grade or "Grade4"
+	assert(Grades.valid(def.grade), def.id .. ": bad grade " .. tostring(def.grade))
+	def.params = def.params or {}
+	def.tags = def.tags or {}
+	if components[def.id] then
+		warn("[CurseBody] component " .. def.id .. " registered twice; replacing")
+	end
+	components[def.id] = def
+	return def
+end
+
+local pendingVariants = {}
+local loading = false
+
+-- Register a variant of an existing component with different default params.
+-- While the catalog loads, variants of components from later modules are deferred.
+function Registry.variant(baseId, def)
+	local base = components[baseId]
+	if not base and loading then
+		table.insert(pendingVariants, { baseId, def })
+		return def
+	end
+	assert(base, "variant of unknown component " .. tostring(baseId))
+	local params = table.clone(base.params)
+	for k, v in pairs(def.params or {}) do
+		params[k] = v
+	end
+	local out = table.clone(base)
+	for k, v in pairs(def) do
+		out[k] = v
+	end
+	out.params = params
+	out.base = baseId
+	return Registry.register(out)
+end
+
+function Registry.registerTransformation(def)
+	assert(type(def.id) == "string" and type(def.stages) == "table", "transformation needs id + stages")
+	def.grade = def.grade or "Grade3"
+	transformations[def.id] = def
+	return def
+end
+
+function Registry.get(id)
+	return components[id]
+end
+
+function Registry.getTransformation(id)
+	return transformations[id]
+end
+
+function Registry.accepts(def, slotName)
+	if not def then
+		return false
+	end
+	for _, s in ipairs(def.slots) do
+		if s == slotName then
+			return true
+		end
+	end
+	return false
+end
+
+-- Components usable in a slot (optionally only those the grade unlocks), sorted by id.
+function Registry.list(slotName, grade)
+	local out = {}
+	for _, def in pairs(components) do
+		if Registry.accepts(def, slotName) and (grade == nil or Grades.atLeast(grade, def.grade)) then
+			table.insert(out, def)
+		end
+	end
+	table.sort(out, function(a, b)
+		return a.id < b.id
+	end)
+	return out
+end
+
+function Registry.listTransformations(grade)
+	local out = {}
+	for _, def in pairs(transformations) do
+		if grade == nil or Grades.atLeast(grade, def.grade) then
+			table.insert(out, def)
+		end
+	end
+	table.sort(out, function(a, b)
+		return a.id < b.id
+	end)
+	return out
+end
+
+function Registry.all()
+	return components
+end
+
+function Registry.units(def, params)
+	local c = def.count
+	if type(c) == "function" then
+		return c(params)
+	end
+	return c or 1
+end
+
+function Registry.loadModule(module)
+	local result = require(module)
+	if type(result) == "function" then
+		result(Registry)
+	elseif type(result) == "table" then
+		for _, def in ipairs(result) do
+			if def.stages then
+				Registry.registerTransformation(def)
+			else
+				Registry.register(def)
+			end
+		end
+	end
+end
+
+function Registry.loadCatalog(folder)
+	if loaded then
+		return
+	end
+	loaded = true
+	local modules = {}
+	for _, child in ipairs(folder:GetChildren()) do
+		if child:IsA("ModuleScript") and string.sub(child.Name, 1, 1) ~= "_" then
+			table.insert(modules, child)
+		end
+	end
+	table.sort(modules, function(a, b)
+		return a.Name < b.Name
+	end)
+	loading = true
+	for _, module in ipairs(modules) do
+		Registry.loadModule(module)
+	end
+	loading = false
+	-- resolve deferred variants (a variant may itself be the base of another)
+	local progress = true
+	while #pendingVariants > 0 and progress do
+		progress = false
+		local still = {}
+		for _, v in ipairs(pendingVariants) do
+			if components[v[1]] then
+				Registry.variant(v[1], v[2])
+				progress = true
+			else
+				table.insert(still, v)
+			end
+		end
+		pendingVariants = still
+	end
+	for _, v in ipairs(pendingVariants) do
+		warn("[CurseBody] variant " .. tostring(v[2].id) .. " of unknown component " .. tostring(v[1]))
+	end
+end
+
+return Registry
+]]></ProtectedString></Properties></Item><Item class="ModuleScript" referent="RBX16"><Properties><string name="Name">Rig</string><ProtectedString name="Source"><![CDATA[--!nonstrict
+--[[
+	The R6 foundation. The six body parts, their sizes and the six Motor6D names
+	never change, so the default Animate script and every R6 animation still work.
+	Anatomy only moves joint C0s (posture) and Humanoid.HipHeight (leg length).
+]]
+
+local Util = require(script.Parent.Util)
+local BodyTypes = require(script.Parent.BodyTypes)
+
+local Rig = {}
+
+Rig.PARTS = { "Head", "Torso", "Left Arm", "Right Arm", "Left Leg", "Right Leg" }
+Rig.SIZES = {
+	HumanoidRootPart = Vector3.new(2, 2, 1),
+	Torso = Vector3.new(2, 2, 1),
+	Head = Vector3.new(2, 1, 1),
+	["Right Arm"] = Vector3.new(1, 2, 1),
+	["Left Arm"] = Vector3.new(1, 2, 1),
+	["Right Leg"] = Vector3.new(1, 2, 1),
+	["Left Leg"] = Vector3.new(1, 2, 1),
+}
+
+-- standard R6 joint rotations
+Rig.ROT = {
+	root = CFrame.new(0, 0, 0, -1, 0, 0, 0, 0, 1, 0, 1, 0),
+	right = CFrame.new(0, 0, 0, 0, 0, 1, 0, 1, 0, -1, 0, 0),
+	left = CFrame.new(0, 0, 0, 0, 0, -1, 0, 1, 0, 1, 0, 0),
+}
+
+-- name, Part0, Part1, default C0 position, C1 position, rotation
+Rig.JOINTS = {
+	{ "RootJoint", "HumanoidRootPart", "Torso", Vector3.new(0, 0, 0), Vector3.new(0, 0, 0), "root" },
+	{ "Neck", "Torso", "Head", Vector3.new(0, 1, 0), Vector3.new(0, -0.5, 0), "root" },
+	{ "Right Shoulder", "Torso", "Right Arm", Vector3.new(1, 0.5, 0), Vector3.new(-0.5, 0.5, 0), "right" },
+	{ "Left Shoulder", "Torso", "Left Arm", Vector3.new(-1, 0.5, 0), Vector3.new(0.5, 0.5, 0), "left" },
+	{ "Right Hip", "Torso", "Right Leg", Vector3.new(1, -1, 0), Vector3.new(0.5, 1, 0), "right" },
+	{ "Left Hip", "Torso", "Left Leg", Vector3.new(-1, -1, 0), Vector3.new(-0.5, 1, 0), "left" },
+}
+
+-- Rotations that point a socket's +Y out of a surface.
+Rig.FACING = {
+	Up = CFrame.identity,
+	Down = CFrame.Angles(math.pi, 0, 0),
+	Front = CFrame.Angles(-math.pi / 2, 0, 0),
+	Back = CFrame.Angles(math.pi / 2, 0, 0),
+	Right = CFrame.Angles(0, 0, -math.pi / 2),
+	Left = CFrame.Angles(0, 0, math.pi / 2),
+}
+
+function Rig.isR6(character)
+	local humanoid = character and character:FindFirstChildOfClass("Humanoid")
+	if not humanoid or humanoid.RigType ~= Enum.HumanoidRigType.R6 then
+		return false, "character is not an R6 Humanoid"
+	end
+	for _, name in ipairs(Rig.PARTS) do
+		if not character:FindFirstChild(name) then
+			return false, "missing R6 part " .. name
+		end
+	end
+	return true
+end
+
+-- Build a fresh R6 rig (for NPCs, previews and StarterCharacter).
+function Rig.create(name, cframe)
+	local model = Instance.new("Model")
+	model.Name = name or "Curse"
+	for partName, size in pairs(Rig.SIZES) do
+		local p = Instance.new("Part")
+		p.Name = partName
+		p.Size = size
+		p.TopSurface = Enum.SurfaceType.Smooth
+		p.BottomSurface = Enum.SurfaceType.Smooth
+		p.CanCollide = partName == "Torso" or partName == "Head"
+		p.Transparency = partName == "HumanoidRootPart" and 1 or 0
+		p.Parent = model
+	end
+	local humanoid = Instance.new("Humanoid")
+	humanoid.RigType = Enum.HumanoidRigType.R6
+	humanoid.Parent = model
+	for _, j in ipairs(Rig.JOINTS) do
+		local m = Instance.new("Motor6D")
+		m.Name = j[1]
+		m.Part0 = model[j[2]]
+		m.Part1 = model[j[3]]
+		m.C0 = CFrame.new(j[4]) * Rig.ROT[j[6]]
+		m.C1 = CFrame.new(j[5]) * Rig.ROT[j[6]]
+		m.MaxVelocity = 0.1
+		m.Parent = model[j[2]]
+	end
+	model.PrimaryPart = model.HumanoidRootPart
+	model.HumanoidRootPart.CFrame = cframe or CFrame.new(0, 3, 0)
+	Rig.snap(model)
+	return model
+end
+
+-- Place every part where its joints say (edit mode has no physics solver running).
+function Rig.snap(character)
+	for _, j in ipairs(Rig.JOINTS) do
+		local p0 = character:FindFirstChild(j[2])
+		local m = p0 and p0:FindFirstChild(j[1])
+		if m and m.Part0 and m.Part1 then
+			m.Part1.CFrame = m.Part0.CFrame * m.C0 * m.C1:Inverse()
+		end
+	end
+end
+
+-- Remove the human look: clothing, accessories, face, head mesh. Hide base parts.
+function Rig.prepare(character, hideBase)
+	for _, d in ipairs(character:GetDescendants()) do
+		if d:IsA("Accessory") or d:IsA("Shirt") or d:IsA("Pants") or d:IsA("ShirtGraphic")
+			or d:IsA("CharacterMesh") or d:IsA("BodyColors") then
+			d:Destroy()
+		elseif (d:IsA("Decal") or d:IsA("SpecialMesh")) and d.Parent and d.Parent.Name == "Head"
+			and d.Parent.Parent == character then
+			d:Destroy()
+		end
+	end
+	if hideBase ~= false then
+		for _, name in ipairs(Rig.PARTS) do
+			character[name].Transparency = 1
+		end
+	end
+	local humanoid = character:FindFirstChildOfClass("Humanoid")
+	humanoid.DisplayDistanceType = Enum.HumanoidDisplayDistanceType.None
+	local curse = character:FindFirstChild("CurseBody")
+	if not curse then
+		curse = Instance.new("Model")
+		curse.Name = "CurseBody"
+		curse.Parent = character
+	end
+	return curse
+end
+
+--[[
+	Joint layout from anatomy. The torso leans forward by `hunch` degrees around the
+	pelvis; the neck and shoulders ride on that lean, so a hunched Curse carries its
+	head low and forward and its arms hang in front, in every animation.
+	Returns torso-local positions plus the "spine" frame torso components build in.
+]]
+function Rig.computeLayout(body)
+	local m, L = body.mass, body.layout
+	local spine = CFrame.new(0, -1, 0) * CFrame.Angles(math.rad(-L.hunch), 0, 0)
+	local H = m.TorsoH
+	local layout = { spine = spine, legExtra = L.legExtra }
+
+	local neckBase = spine * Vector3.new(0, 2 * H - L.neckDrop, -0.1 * m.TorsoD)
+	local headCenter = neckBase + Vector3.new(0, 0.5 * m.Head, -0.05 - L.neckForward)
+	layout.neck = headCenter - Vector3.new(0, 0.5, 0)
+
+	for _, sideName in ipairs({ "Right", "Left" }) do
+		local s = sideName == "Right" and 1 or -1
+		local armThick = BodyTypes.get(body, "ArmThick", sideName)
+		local shoulder = BodyTypes.get(body, "Shoulder", sideName)
+		local x = m.TorsoW + (armThick - 1) * 0.4 + (shoulder - 1) * 0.25
+		local p = spine * Vector3.new(s * x, 2 * H - 0.5 - L.shoulderDrop, 0)
+		layout["shoulder" .. sideName] = p + Vector3.new(0, 0, -L.shoulderForward)
+		local legThick = BodyTypes.get(body, "LegThick", sideName)
+		layout["hip" .. sideName] = Vector3.new(s * (1 + (legThick - 1) * 0.45 + L.hipSpread), -1, 0)
+	end
+	return layout
+end
+
+function Rig.applyLayout(character, layout)
+	local torso = character.Torso
+	local set = {
+		Neck = layout.neck,
+		["Right Shoulder"] = layout.shoulderRight,
+		["Left Shoulder"] = layout.shoulderLeft,
+		["Right Hip"] = layout.hipRight,
+		["Left Hip"] = layout.hipLeft,
+	}
+	for _, j in ipairs(Rig.JOINTS) do
+		local pos = set[j[1]]
+		local m = torso:FindFirstChild(j[1])
+		if pos and m then
+			m.C0 = CFrame.new(pos) * Rig.ROT[j[6]]
+			m.C1 = CFrame.new(j[5]) * Rig.ROT[j[6]]
+		end
+	end
+	local humanoid = character:FindFirstChildOfClass("Humanoid")
+	-- R6: HipHeight is an offset added to the leg length
+	humanoid.HipHeight = layout.legExtra
+end
+
+--[[
+	Fallback sockets on the base parts, defined before any component builds.
+	Region components redefine them on their real surfaces.
+	name → { part, position, facing, side }
+]]
+function Rig.defaultSockets(body, layout)
+	local m = body.mass
+	local spine = layout.spine
+	local H, W, D = m.TorsoH, m.TorsoW, m.TorsoD
+	local F = Rig.FACING
+	local function sp(x, y, z)
+		return spine * Vector3.new(x, y, z)
+	end
+	local s = {
+		-- head
+		Crown = { "Head", Vector3.new(0, 0.6, 0.05), F.Up },
+		TopR = { "Head", Vector3.new(0.45, 0.5, 0), CFrame.Angles(0, 0, math.rad(-25)), 1 },
+		TopL = { "Head", Vector3.new(-0.45, 0.5, 0), CFrame.Angles(0, 0, math.rad(25)), -1 },
+		Brow = { "Head", Vector3.new(0, 0.3, -0.55), CFrame.Angles(math.rad(-55), 0, 0) },
+		Face = { "Head", Vector3.new(0, 0, -0.6), F.Front },
+		EyeR = { "Head", Vector3.new(0.3, 0.1, -0.55), F.Front, 1 },
+		EyeL = { "Head", Vector3.new(-0.3, 0.1, -0.55), F.Front, -1 },
+		Mouth = { "Head", Vector3.new(0, -0.25, -0.55), F.Front },
+		Jaw = { "Head", Vector3.new(0, -0.5, -0.3), F.Down },
+		CheekR = { "Head", Vector3.new(0.5, -0.1, -0.35), CFrame.Angles(0, math.rad(40), 0) * F.Front, 1 },
+		CheekL = { "Head", Vector3.new(-0.5, -0.1, -0.35), CFrame.Angles(0, math.rad(-40), 0) * F.Front, -1 },
+		TempleR = { "Head", Vector3.new(0.6, 0.2, 0), F.Right, 1 },
+		TempleL = { "Head", Vector3.new(-0.6, 0.2, 0), F.Left, -1 },
+		EarR = { "Head", Vector3.new(0.62, 0, 0.05), F.Right, 1 },
+		EarL = { "Head", Vector3.new(-0.62, 0, 0.05), F.Left, -1 },
+		BackOfHead = { "Head", Vector3.new(0, 0.2, 0.55), F.Back },
+		-- torso (positions ride the hunched spine)
+		Chest = { "Torso", sp(0, 1.45 * H, -0.55 * D), F.Front },
+		ChestR = { "Torso", sp(0.55 * W, 1.5 * H, -0.5 * D), F.Front, 1 },
+		ChestL = { "Torso", sp(-0.55 * W, 1.5 * H, -0.5 * D), F.Front, -1 },
+		Belly = { "Torso", sp(0, 0.55 * H, -0.55 * D), F.Front },
+		ChestLowR = { "Torso", sp(0.65 * W, 0.9 * H, -0.4 * D), F.Front, 1 },
+		ChestLowL = { "Torso", sp(-0.65 * W, 0.9 * H, -0.4 * D), F.Front, -1 },
+		UpperBack = { "Torso", sp(0, 1.6 * H, 0.6 * D), F.Back },
+		Back = { "Torso", sp(0, 1.1 * H, 0.6 * D), F.Back },
+		BackR = { "Torso", sp(0.55 * W, 1.45 * H, 0.55 * D), F.Back, 1 },
+		BackL = { "Torso", sp(-0.55 * W, 1.45 * H, 0.55 * D), F.Back, -1 },
+		LowerBack = { "Torso", sp(0, 0.45 * H, 0.55 * D), F.Back },
+		TailRoot = { "Torso", Vector3.new(0, -0.8, 0.5 * D), F.Back },
+		FlankR = { "Torso", sp(0.95 * W, 1.0 * H, 0), F.Right, 1 },
+		FlankL = { "Torso", sp(-0.95 * W, 1.0 * H, 0), F.Left, -1 },
+		ShoulderR = { "Torso", sp(0.85 * W, 2.05 * H, 0), F.Up, 1 },
+		ShoulderL = { "Torso", sp(-0.85 * W, 2.05 * H, 0), F.Up, -1 },
+		Neck = { "Torso", sp(0, 2.0 * H, 0.15), F.Up },
+		HipR = { "Torso", Vector3.new(0.9 * W, -0.8, 0), F.Right, 1 },
+		HipL = { "Torso", Vector3.new(-0.9 * W, -0.8, 0), F.Left, -1 },
+	}
+	for _, sideName in ipairs({ "Right", "Left" }) do
+		local k, sx = string.sub(sideName, 1, 1), sideName == "Right" and 1 or -1
+		local arm, leg = sideName .. " Arm", sideName .. " Leg"
+		local len = BodyTypes.get(body, "ArmLength", sideName)
+		local handY = -1 - (len - 1) * 2.2
+		s["Shoulder_" .. k] = { arm, Vector3.new(0, 0.8, 0), F.Up, sx }
+		s["UpperArm_" .. k] = { arm, Vector3.new(0.5 * sx, 0.3, 0), sx > 0 and F.Right or F.Left, sx }
+		s["Elbow_" .. k] = { arm, Vector3.new(0, handY * 0.35, 0.5), F.Back, sx }
+		s["Forearm_" .. k] = { arm, Vector3.new(0.5 * sx, handY * 0.6, 0), sx > 0 and F.Right or F.Left, sx }
+		s["Hand_" .. k] = { arm, Vector3.new(0, handY, 0), F.Down, sx }
+		s["Palm_" .. k] = { arm, Vector3.new(0, handY - 0.3, -0.3), F.Front, sx }
+		s["Thigh_" .. k] = { leg, Vector3.new(0, 0.4, -0.5), F.Front, sx }
+		s["Knee_" .. k] = { leg, Vector3.new(0, -0.2, -0.5), F.Front, sx }
+		s["Shin_" .. k] = { leg, Vector3.new(0.45 * sx, -0.45, 0), sx > 0 and F.Right or F.Left, sx }
+		s["Foot_" .. k] = { leg, Vector3.new(0, -1 - layout.legExtra, 0), F.Up, sx }
+	end
+	return s
+end
+
+Rig.util = Util
+return Rig
+]]></ProtectedString></Properties></Item><Item class="ModuleScript" referent="RBX17"><Properties><string name="Name">Slots</string><ProtectedString name="Source"><![CDATA[--!nonstrict
+--[[
+	Anatomy slots. Pure data: add a row to add a new kind of body part.
+
+	kind      "single" – one component id
+	          "sided"  – one id for both sides, or { Right = id, Left = id }
+	          "multi"  – list of entries (id string or { id=, socket=, pos=, rot=, scale=, params= })
+	          "limbs"  – like multi, but a plain number means "that many extra limbs"
+	order     build order (sockets defined by earlier slots are available to later ones)
+	region    top-level folder under CurseBody
+	folder    folder that holds this slot's geometry
+	dependents  slots rebuilt when this one changes (they use its sockets)
+	cap       key into Grades caps limiting how many entries/limbs are allowed
+]]
+
+local Slots = {}
+
+Slots.list = {
+	{ name = "Torso", region = "Torso", folder = "BaseTorso", kind = "single", order = 10, default = "NormalTorso",
+		dependents = { "Head", "Arms", "Legs", "TorsoGrowths", "Back", "Tails", "ExtraArms", "ExtraLegs", "ExtraHeads", "Disfigurements" } },
+	{ name = "Head", region = "Head", folder = "BaseHead", kind = "single", order = 20, default = "HumanCurseHead",
+		dependents = { "Horns", "Eyes", "Mouths", "HeadGrowths", "Disfigurements" } },
+	{ name = "Arms", region = "Arms", folder = "ArmVariant", kind = "sided", order = 30, default = "NormalArm",
+		dependents = { "Hands", "ExtraArms", "Disfigurements" } },
+	{ name = "Hands", region = "Arms", folder = "HandVariant", kind = "sided", order = 35, default = "Hand",
+		dependents = { "ExtraArms", "Disfigurements" } },
+	{ name = "Legs", region = "Legs", folder = "LegVariant", kind = "sided", order = 40, default = "NormalLeg",
+		dependents = { "Feet", "ExtraLegs", "Disfigurements" } },
+	{ name = "Feet", region = "Legs", folder = "FootVariant", kind = "sided", order = 45, default = "Foot",
+		dependents = { "ExtraLegs", "Disfigurements" } },
+	{ name = "ExtraArms", region = "Arms", folder = "ExtraArms", kind = "limbs", order = 50, cap = "ExtraArms",
+		dependents = { "Disfigurements" } },
+	{ name = "ExtraLegs", region = "Legs", folder = "ExtraLegs", kind = "limbs", order = 55, cap = "ExtraLegs",
+		dependents = { "Disfigurements" } },
+	{ name = "ExtraHeads", region = "Back", folder = "ExtraHeads", kind = "limbs", order = 58, cap = "ExtraHeads",
+		dependents = { "Disfigurements" } },
+	{ name = "Horns", region = "Head", folder = "HornSet", kind = "multi", order = 60, cap = "Horns" },
+	{ name = "Eyes", region = "Head", folder = "Eyes", kind = "multi", order = 62, cap = "Eyes" },
+	{ name = "Mouths", region = "Head", folder = "Mouths", kind = "multi", order = 64, cap = "Mouths" },
+	{ name = "HeadGrowths", region = "Head", folder = "HeadGrowths", kind = "multi", order = 66, cap = "HeadGrowths" },
+	{ name = "TorsoGrowths", region = "Torso", folder = "TorsoGrowths", kind = "multi", order = 70, cap = "TorsoGrowths",
+		dependents = { "Disfigurements" } },
+	{ name = "Back", region = "Back", folder = "BackParts", kind = "multi", order = 75, cap = "Back" },
+	{ name = "Tails", region = "Back", folder = "Tails", kind = "multi", order = 80, cap = "Tails" },
+	{ name = "Disfigurements", region = "Disfigurements", folder = "Disfigurements", kind = "multi", order = 90,
+		cap = "Disfigurements" },
+}
+
+Slots.byName = {}
+for _, slot in ipairs(Slots.list) do
+	Slots.byName[slot.name] = slot
+end
+table.sort(Slots.list, function(a, b)
+	return a.order < b.order
+end)
+
+function Slots.get(name)
+	return Slots.byName[name]
+end
+
+-- All slots that must rebuild when `name` changes (transitively).
+function Slots.dependentsOf(name, out)
+	out = out or {}
+	local slot = Slots.byName[name]
+	for _, dep in ipairs(slot and slot.dependents or {}) do
+		if not out[dep] then
+			out[dep] = true
+			Slots.dependentsOf(dep, out)
+		end
+	end
+	return out
+end
+
+return Slots
+]]></ProtectedString></Properties></Item><Item class="ModuleScript" referent="RBX18"><Properties><string name="Name">Util</string><ProtectedString name="Source"><![CDATA[--!nonstrict
+-- Small helpers shared by the framework.
+
+local Util = {}
+
+function Util.deepCopy(value)
+	if type(value) ~= "table" then
+		return value
+	end
+	local out = {}
+	for k, v in pairs(value) do
+		out[k] = Util.deepCopy(v)
+	end
+	return out
+end
+
+-- Deterministic serialization (sorted keys) used to diff slot values.
+function Util.serialize(value)
+	local t = type(value)
+	if t == "table" then
+		local keys = {}
+		for k in pairs(value) do
+			table.insert(keys, k)
+		end
+		table.sort(keys, function(a, b)
+			return tostring(a) < tostring(b)
+		end)
+		local parts = {}
+		for _, k in ipairs(keys) do
+			table.insert(parts, tostring(k) .. "=" .. Util.serialize(value[k]))
+		end
+		return "{" .. table.concat(parts, ",") .. "}"
+	elseif t == "number" then
+		return string.format("%.4f", value)
+	end
+	return tostring(value)
+end
+
+function Util.hash(str)
+	local h = 5381
+	for i = 1, #str do
+		h = (h * 33 + string.byte(str, i)) % 2147483647
+	end
+	return h
+end
+
+function Util.v3(t, default)
+	if t == nil then
+		return default or Vector3.zero
+	end
+	if typeof(t) == "Vector3" then
+		return t
+	end
+	if type(t) == "number" then
+		return Vector3.new(t, t, t)
+	end
+	return Vector3.new(t[1] or 0, t[2] or 0, t[3] or 0)
+end
+
+function Util.angles(t)
+	if t == nil then
+		return CFrame.identity
+	end
+	return CFrame.Angles(math.rad(t[1] or 0), math.rad(t[2] or 0), math.rad(t[3] or 0))
+end
+
+function Util.merge(base, over)
+	local out = Util.deepCopy(base or {})
+	for k, v in pairs(over or {}) do
+		out[k] = Util.deepCopy(v)
+	end
+	return out
+end
+
+function Util.isArray(t)
+	return type(t) == "table" and (#t > 0 or next(t) == nil)
+end
+
+function Util.lerp(a, b, t)
+	return a + (b - a) * t
+end
+
+return Util
+]]></ProtectedString></Properties></Item></Item></roblox>

@@ -1,0 +1,23 @@
+{
+  "name": "CurseBody",
+  "tree": {
+    "$className": "DataModel",
+    "ReplicatedStorage": {
+      "CurseBody": {
+        "$path": "src/shared/CurseBody"
+      }
+    },
+    "ServerScriptService": {
+      "CurseService": {
+        "$path": "src/server/CurseService.server.lua"
+      }
+    },
+    "StarterPlayer": {
+      "StarterPlayerScripts": {
+        "CurseClient": {
+          "$path": "src/client/CurseClient.client.lua"
+        }
+      }
+    }
+  }
+}
