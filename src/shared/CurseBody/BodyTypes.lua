@@ -102,6 +102,7 @@ function BodyTypes.resolve(appearance)
 		mass = Util.merge(NORMAL_MASS, def.mass),
 		layout = Util.merge(NORMAL_LAYOUT, def.layout),
 		side = { Right = Util.deepCopy(def.side and def.side.Right or {}), Left = Util.deepCopy(def.side and def.side.Left or {}) },
+		flags = {}, -- set by component mutate hooks (e.g. OpenChest)
 	}
 	for scaleKey, value in pairs(appearance.Scales or {}) do
 		local sideName, key = string.match(scaleKey, "^(%a-)_(%a+)$")

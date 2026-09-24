@@ -18,6 +18,24 @@ end
 
 local RS = game:GetService("ReplicatedStorage")
 local module = MOCK.mount(BUNDLE_TREE, RS)
+
+-- stand-in for the imported mesh library: one MeshPart per manifest piece (+ mirrored "_L")
+do
+	local Library = MOCK.require(module.Meshes.Library)
+	local assets = Instance.new("Folder")
+	assets.Name = "CurseAssets"
+	for _, c in pairs(Library.components) do
+		for _, piece in ipairs(c.pieces) do
+			for _, suffix in ipairs(c.sided and { "", "_L" } or { "" }) do
+				local mp = Instance.new("MeshPart")
+				mp.Name = piece.name .. suffix
+				mp.Size = Vector3.new(piece.size[1], piece.size[2], piece.size[3])
+				mp.Parent = assets
+			end
+		end
+	end
+	assets.Parent = RS
+end
 local CurseBody = MOCK.require(module)
 local Registry, Slots, Grades, Appearance = CurseBody.Registry, CurseBody.Slots, CurseBody.Grades, CurseBody.Appearance
 check(#takeWarnings() == 0, "catalog loads without warnings")

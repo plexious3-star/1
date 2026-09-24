@@ -314,8 +314,9 @@ local function refresh(state, opts)
 	local character = state.character
 	local eff, issues = Appearance.resolve(state.base, state.form, state.grade)
 	local body = resolveBody(eff)
-	local layout = Rig.computeLayout(body)
-	local bodyKey = Util.serialize({ body.mass, body.side, body.layout, eff.Palette, eff.Seed })
+	local torsoDef = Registry.get(eff.Torso or "")
+	local layout = Rig.computeLayout(body, torsoDef and torsoDef.layout)
+	local bodyKey = Util.serialize({ body.mass, body.side, body.layout, body.flags, eff.Torso, eff.Palette, eff.Seed })
 	local full = opts.full or bodyKey ~= state.bodyKey
 
 	local scale = character:GetScale()

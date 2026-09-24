@@ -101,7 +101,7 @@ end
 function Registry.list(slotName, grade)
 	local out = {}
 	for _, def in pairs(components) do
-		if Registry.accepts(def, slotName) and (grade == nil or Grades.atLeast(grade, def.grade)) then
+		if Registry.accepts(def, slotName) and not def.hidden and (grade == nil or Grades.atLeast(grade, def.grade)) then
 			table.insert(out, def)
 		end
 	end

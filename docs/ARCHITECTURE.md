@@ -1,35 +1,38 @@
 # Curse Body System — Architecture
 
-A data-driven anatomy framework for player-controlled Curses on the classic
-Roblox **R6** rig. One appearance table in, one grotesque (and fully animated)
-body out. The red creature in `reference/` is the quality bar: it is rebuilt
-here as one preset (`CrimsonHusk`), not as the system itself.
+**R6 skeleton + sculpted organic meshes + modular curse anatomy.**
+
+The classic R6 rig is only the **skeleton**: six invisible parts, six standard
+Motor6Ds, the Humanoid. Everything you see is a sculpted **MeshPart** from a mesh
+library, welded to those bones. The R6 blocks never show and never decide the
+silhouette. They exist so every R6 animation, the default `Animate` script,
+physics, ragdoll and hitboxes keep working.
 
 ```
- profile (DataStore)            catalog (data + builders)          character
- ┌──────────────────┐           ┌───────────────────────┐          ┌──────────────────────┐
- │ Grade            │           │ Heads  Horns  Eyes    │          │ R6 rig (6 parts,     │
- │ Appearance ──────┼─sanitize─▶│ Mouths Torsos Arms …  │─build──▶ │ standard Motor6Ds)   │
- │ Forms / Unlocks  │ (grade)   │ Transformations       │          │ └ CurseBody (Model)  │
- └──────────────────┘           └───────────────────────┘          │   ├ Head/ Torso/ …   │
-                                                                   │   └ sockets, limbs   │
-                                                                   └──────────────────────┘
+ tools/sculpt (Python, offline)                 Roblox (runtime)
+ ┌────────────────────────────────┐             ┌───────────────────────────────────────┐
+ │ SDF sculpts → marching cubes → │  OBJ files  │ ReplicatedStorage.CurseAssets          │
+ │ smooth → decimate → split by   │ ──import──▶ │   (imported MeshParts, by piece name)  │
+ │ palette role → mirror L        │             │                                        │
+ │                                │  manifest   │ CurseBody (framework)                  │
+ │ Library.lua: pieces, sockets,  │ ──────────▶ │   appearance + grade → clone, scale,   │
+ │ joint layout, variants         │             │   weld meshes onto the R6 skeleton     │
+ └────────────────────────────────┘             └───────────────────────────────────────┘
 ```
 
-Code lives in `src/` (Rojo layout, see `default.project.json`):
-
-| Path | Becomes | Role |
-|---|---|---|
-| `src/shared/CurseBody/` | `ReplicatedStorage.CurseBody` | the framework (ModuleScripts) |
-| `src/shared/CurseBody/Catalog/` | | every body part, horn, growth, transformation |
-| `src/server/CurseService.server.lua` | `ServerScriptService` | loads/saves profiles, builds bodies, handles transformation requests |
-| `src/client/CurseClient.client.lua` | `StarterPlayerScripts` | tail/tendril sway, extra-limb motion, grow-in effects |
+| Path | Role |
+|---|---|
+| `tools/sculpt/sdf.py` | sculpting engine: SDF primitives, smooth blending, carving, material painting, meshing |
+| `tools/sculpt/library.py` | every modular component, sculpted in its own local space → `assets/meshes/library/*.obj` + manifest |
+| `tools/sculpt/husk.py` | the reference creature's parts (shared with the library as `Husk*` components) |
+| `src/shared/CurseBody/` | runtime framework (`ReplicatedStorage.CurseBody`) |
+| `src/shared/CurseBody/Meshes/Library.lua` | generated manifest: pieces, sockets, joint layouts, variants |
+| `src/shared/CurseBody/Catalog/` | `Meshes` (registers the library), `Sets` (horn sets, wing pairs, mutations), `Transformations` |
+| `src/server/`, `src/client/` | CurseService (profiles, grade checks, forms), CurseClient (sway, extra-limb motion, grow-in) |
 
 ---
 
 ## 1. R6 base rig structure
-
-The rig is never replaced. Every Curse is a normal R6 character:
 
 ```
 Character (Model)
@@ -38,303 +41,228 @@ Character (Model)
 │       ── Right Shoulder / Left Shoulder ──▶ Right Arm / Left Arm
 │       ── Right Hip / Left Hip ──▶ Right Leg / Left Leg
 ├ Humanoid (RigType R6)
-└ CurseBody (Model)   ← everything this system adds
+└ CurseBody (Model)   ← every visible mesh, extra limb and joint this system adds
 ```
 
-* The six body parts keep their **standard names, sizes and Motor6D names**, so
-  the default `Animate` script and any R6 animation play unchanged.
-* The base parts become invisible once a region variant covers them; they still
-  provide collisions, hit detection and the joints everything hangs from.
-* Posture is joint layout, not part size: the body type (and transformations)
-  move the Motor6D **C0** positions (head low and forward, wide shoulders, wide
-  hips). Animations write `Motor6D.Transform` on top of C0, so a hunch survives
-  every animation.
-* Visible leg length is changed with `Humanoid.HipHeight`, which on R6 is an
-  offset added to the leg length. Long legs extend the leg shell below the base
-  leg and raise the body; short legs do the opposite. The base legs keep
-  animating either way.
-* Overall size (`Appearance.Height`) is the only thing done with `Model:ScaleTo`,
-  and it is capped per grade. Anatomy never depends on it.
+* The six parts keep their standard names, sizes and Motor6D names. They are
+  **invisible** (`Transparency = 1`) and only provide joints, collisions and
+  hitboxes.
+* The joint **layout** comes from the torso mesh. Each sculpted torso ships the
+  C0 positions its anatomy was sculpted around (neck, shoulders, hips, tail root)
+  and its leg extension. A hunched torso puts the neck low and forward. A massive
+  one puts the shoulders wide. Animations write `Motor6D.Transform` on top of C0,
+  so posture survives every animation.
+* Visible leg length uses `Humanoid.HipHeight`, which on R6 is an offset added to
+  the leg length. Leg meshes are stretched to reach the ground. CrimsonHusk's
+  legs are 0.35 studs longer than an R6 leg, like the reference.
+* `Appearance.Height` (`Model:ScaleTo`) is overall size only, capped per grade.
 
 ## 2. Modular body-part structure
 
-Anatomy is split into **slots**. Each slot holds one or more **components** from
-the catalog. The slot table (`Slots.lua`) is data, so new slots can be added.
+Anatomy is split into **slots** (`Slots.lua`, pure data). Each slot holds
+components from the mesh library.
 
-| Region | Slot | Kind | Examples |
+| Region | Slot | Kind | Library components |
 |---|---|---|---|
-| Head | `Head` | single | HumanCurseHead, AnimalHead, OctopoidHead, SplitJawHead, FacelessHead, SkullHead… |
-| | `Horns` | multi | RamHorns, CrownOfHorns, Antlers, BrokenHorn, custom horns with params… |
-| | `Eyes` | multi | Eye, GiantEye, EyeCluster, EyeStalk, CompoundEye, MissingEye |
-| | `Mouths` | multi | SlitMouth, GrinMouth, Maw, LampreyMouth, Mandibles, TongueMouth |
-| | `HeadGrowths` | multi | ExtraEar, BoneSpur, FacePlate, Tumor, Crest, Antennae… |
-| Torso | `Torso` | single | NormalTorso, MuscularTorso, EmaciatedTorso, HunchedTorso, WideTorso, RibbedTorso, OrbTorso |
-| | `TorsoGrowths` | multi | ChestCavity, ExposedOrgans, BonePlating, OrganicArmor, RibGrowth, ShoulderGrowth, SecondaryMass |
-| Arms | `Arms` | sided | NormalArm, MuscularArm, ThinArm, LongArm, BoneArm, TentacleArm, MultiJointArm… |
-| | `Hands` | sided | Hand, Fist, ClawedHand, BladedFingers, TalonHand, OversizedHand… |
-| | `ExtraArms` | multi | any arm and hand pair, at any torso socket |
-| Legs | `Legs` | sided | NormalLeg, MassiveLeg, ThinLeg, DigitigradeLeg, ReverseJointLeg, LongLeg, SerpentBody… |
-| | `Feet` | sided | Foot, ClawedFoot, HoofFoot, TalonFoot, EnlargedFoot… |
-| | `ExtraLegs` | multi | any leg and foot pair |
-| Back | `Back` | multi | Wings, BoneWings, Tendrils, Spikes, Shell, BackEyes, OrganicGrowth |
-| | `ExtraHeads` | multi | any head variant on a neck socket |
-| | `Tails` | multi | ThinTail, ThickTail, BladeTail, BoneTail, TendrilTail, CreatureTail… |
-| Anywhere | `Disfigurements` | multi | any eye/mouth/growth anywhere, BoneProtrusion, CrackedFlesh, Tumors, SwollenHand, MissingFingers… |
+| Head | `Head` | single | HumanCurseHead, BeastHead, SkullHead, MandibleHead, FacelessHead, SplitJawHead, HuskHead |
+| | `Horns` | multi | StubHorn, StraightHorn, CurvedHorn, BackHorn, RamHorn, Antler, BrokenHorn, MassiveHorn + sets |
+| | `Eyes` | multi | Eye, GiantEye, EyeCluster, CompoundEye |
+| | `Mouths` | multi | GrinMouth, Maw, Mandibles |
+| | `HeadGrowths` | multi | BoneSpur, ExtraEar, Tumor |
+| Torso | `Torso` | single | NormalTorso, MuscularTorso, EmaciatedTorso, MassiveTorso, HuskTorso (each with a carved-open variant) |
+| | `TorsoGrowths` | multi | ChestCavity (opens the torso mesh), RibGrowth, BoneSpur, Tumor |
+| Arms | `Arms` | sided | NormalArm, MuscularArm, ThinArm, BoneArm, TentacleArm, HuskArm |
+| | `Hands` | sided | OpenHand, Fist, ClawedHand, BladedHand, TalonHand |
+| | `ExtraArms` | limbs | any arm + hand, at any torso socket |
+| Legs | `Legs` | sided | NormalLeg, ThinLeg, MassiveLeg, DigitigradeLeg, HuskLeg, SerpentBody |
+| | `Feet` | sided | Foot, ClawedFoot, HoofFoot, TalonFoot, SplayedFoot |
+| | `ExtraLegs` | limbs | any leg + foot |
+| Back | `Back` | multi | Wings, BoneWings, Tendrils, Spikes, Shell, BackEyes |
+| | `ExtraHeads` | limbs | any head (with its own eyes/mouths/horns) |
+| | `Tails` | multi | HuskTail, BoneTail, BladeTail |
+| Anywhere | `Disfigurements` | multi | any eye / mouth / growth at any socket, BoneProtrusion, CrackedFlesh, mutations |
 
-"Sided" slots take either one id (both sides) or `{ Right = id, Left = id }`,
-which is how asymmetric arms, legs and feet work.
+"Sided" slots take one id or `{ Right = id, Left = id }` (asymmetric bodies).
+Components are authored for the right side. The baker exports mirrored `_L`
+meshes, since a MeshPart can't be mirrored by negative scale.
 
-A **component** is a table registered in the catalog:
-
-```lua
-{
-    id = "RamHorns",
-    slots = { "Horns" },          -- which slots accept it
-    grade = "Grade3",             -- lowest grade that may equip it
-    tags = { "bone", "horn" },
-    params = { length = 2.2, curl = 320 },   -- defaults, overridable per entry
-    build = function(ctx, params, entry) ... end,   -- makes geometry
-    mutate = function(body, params, entry) ... end, -- optional: changes proportions
-}
-```
-
-In the character this becomes the tree from the brief:
+In the character:
 
 ```
 CurseBody
-├ Head   ├ BaseHead  ├ Horns  ├ Eyes  ├ Mouths  └ HeadGrowths
+├ Head   ├ BaseHead ├ HornSet ├ Eyes ├ Mouths └ HeadGrowths
 ├ Torso  ├ BaseTorso └ TorsoGrowths
-├ Arms   ├ RightArm  ├ LeftArm  ├ RightHand  ├ LeftHand  └ ExtraArms
-├ Legs   ├ RightLeg  ├ LeftLeg  ├ RightFoot  ├ LeftFoot  └ ExtraLegs
-├ Back   ├ Back  ├ Tails  └ ExtraHeads
+├ Arms   ├ ArmVariant ├ HandVariant └ ExtraArms
+├ Legs   ├ LegVariant ├ FootVariant └ ExtraLegs
+├ Back   ├ BackParts ├ Tails └ ExtraHeads
 └ Disfigurements
 ```
 
-Each leaf is a Folder that one slot owns. Unequipping a slot destroys its
-folder and nothing else.
+Each folder belongs to one slot, so unequipping a slot destroys only its folder.
 
 ## 3. How body parts attach to R6
 
-All geometry is built by the **builder context** (`Builder.lua`), never by hand:
+Every library component is sculpted in the **local space** of what it attaches
+to. `Catalog/Meshes.lua` knows how to place and scale each space:
 
-| Call | Result |
-|---|---|
-| `ctx:blob(part, pos, size, rot, role)` | ellipsoid (Part + Sphere SpecialMesh), the organic workhorse |
-| `ctx:box / ctx:wedge / ctx:cylinder` | hard-surface pieces: plates, blades, teeth |
-| `ctx:triangle(part, a, b, c, role)` | two WedgeParts forming any triangle: membranes, blades, fins |
-| `ctx:mesh(part, cf, size, meshId, role)` | custom art (`SpecialMesh` FileMesh, settable at runtime) |
-| `ctx:template(name, part, cf)` | clones a MeshPart or model from `CurseBody/Assets` |
-| `ctx:chain(part, cf, segments, opts)` | Motor6D chain of segments: tails, tendrils, tentacles, stalks, wing bones |
-| `ctx:limb(kind, name, side, c0, mirrorJoint, opts)` | extra R6-style limb part driven by its own Motor6D |
+| Space | Attaches to | Scaled by |
+|---|---|---|
+| `torso` | Torso (its center) | TorsoW / TorsoH / TorsoD; carries joint layout + torso sockets |
+| `head` | Head or an extra head | Head, around the neck joint |
+| `arm` | an arm part | thickness × length around the shoulder pivot; defines `Hand_<s>` |
+| `hand` | the arm's `Hand_<s>` socket | Hand |
+| `leg` | a leg part | thickness, stretched to the visible leg length; defines `Foot_<s>` |
+| `foot` | the leg's `Foot_<s>` socket | Foot |
+| `surface` | any socket, +Y out of the body | the entry's scale (horns, eyes, mouths, growths) |
+| `body` | a socket position, torso-aligned, on its own Motor6D | the entry's scale (tails, wings, tendrils, spikes) |
+| `serpent` | the Torso (replaces the legs) | TorsoW |
 
-Rules every piece follows:
+Each piece is a MeshPart cloned from `CurseAssets`, resized, colored by its
+palette **role**, and welded to one bone (`Weld.C0` = offset). Pieces are
+massless and don't collide, so nothing spans two bones or blocks a joint.
+Meshes overlap generously at the joints: the arm's deltoid sinks into the
+torso's shoulder mass, and the head's neck plug into the neck wrap. Rotating a
+limb therefore never opens a hole.
 
-* It is welded to **exactly one** R6 part, extra limb or chain segment, with a
-  `Weld` whose `C0` is the offset. Nothing spans two limbs, so nothing locks a
-  joint, and pieces follow their part through every animation, ragdoll and
-  knockback.
-* Pieces are `Massless`, `CanCollide = false`, `CanTouch = false` and
-  `CanQuery = false`. Physics and hitboxes stay those of a normal R6 character.
-* Colors come from **roles** (`Skin`, `SkinDark`, `Flesh`, `Bone`, `Void`,
-  `Eye`, `Claw`, `Teeth`, `Membrane`, …) resolved through the Curse's
-  **palette**. The same component is red on one Curse and bone-white on another.
-* Sided components are authored once for the right side; `ctx.side = -1`
-  mirrors positions and rotations for the left.
-
-**Sockets** are named, oriented attach points: part plus CFrame, with +Y
-pointing out of the surface. Region variants define them on their own surface
-as they build. For example, `OctopoidHead` puts `Crown`, `TopL`, `TopR`,
-`EyeL`, `EyeR`, `Mouth` and `Jaw` where its skull and face actually are, and
-`MuscularTorso` puts `Chest` further forward than `EmaciatedTorso` does.
-Everything placed later (horns, eyes, mouths, growths, wings, tails, extra
-limbs) asks for a socket by name, so it lands on the real surface of whatever
-body is underneath. Each socket is also created as an `Attachment`
-(`CurseSocket_<Name>`) for VFX and gameplay, for example spawning a projectile
-from a hand mouth.
+**Sockets** are named, oriented attach points each component defines on its own
+sculpted surface. For example, `HuskHead` puts `TopR`/`TopL` on its swept-back
+cranium and `MuscularTorso` puts `Chest` further out than `EmaciatedTorso` does.
+Horns, eyes, mouths, growths, wings, tails and extra limbs ask for a socket by
+name, so they land on the actual surface underneath. Sockets also exist as
+`Attachment`s (`CurseSocket_<Name>`) for VFX and gameplay.
 
 ## 4. How different body proportions are handled
 
-A **body type** (`BodyTypes.lua`) supplies two things:
+A **body type** supplies per-region **mass** (torso width, height and depth;
+shoulders; neck; head; arm thickness and length per side; hands; leg
+thickness; feet). Meshes scale by `mass^0.75` per axis around their own pivot,
+so a heavy build gets a bigger torso mesh, thicker arms and legs, bigger hands
+and a wider joint layout, not a scaled-up character.
 
-* **mass**: per-region multipliers (torso width, height and depth; shoulder
-  mass; neck; arm thickness and length per side; hand; leg thickness; foot;
-  head). Every region builder multiplies its geometry by these, so "Heavy" gets
-  a larger torso, shoulders, arms, hands, thicker legs and a bigger neck, not
-  a bigger character.
-* **layout**: joint positions (shoulder width, height and forward offset; neck
-  height and forward offset; hip width), hunch angle and leg extension.
+Posture and anatomy that scaling can't create, like a hunch or ribs pushing
+through the skin, are **different sculpts**: `EmaciatedTorso`, `MassiveTorso`,
+`HuskTorso`, `DigitigradeLeg` and so on. Transformations swap them.
 
-Built in: `Lean`, `Normal`, `Muscular`, `Heavy`, `Hunched`, `Deformed`
-(seeded asymmetry), `Monstrous` and `Massive`.
-
-Layered on top, in order:
-
-1. body type
-2. `Appearance.Scales` (per-region fine tuning, clamped per grade)
-3. component `mutate` hooks (e.g. `OversizedHand` or `ElongatedArm`)
-4. the active transformation stage
-
-The result is one resolved `body` table (`mass`, `layout`, `legExtra`) that
-every builder reads.
+Resolution order: body type → `Appearance.Scales` (clamped per grade) →
+component `mutate` hooks (SwollenHand, ElongatedArm, AsymmetricShoulder…) →
+transformation stage.
 
 ## 5. How horns and disfigurements are attached
 
-**Horns** use one procedural builder (`Catalog/Horns.lua`) that sweeps a
-tapered, ridged tube along a curve:
-
-`length, thickness, taper, curve, curveDir, spiral, tilt, segments, broken, branches, ridges, role, rootRole, tipRole, mesh`
-
-The registered horns (`StubHorn`, `StraightHorn`, `CurvedHorn`, `BackHorn`,
-`ForwardHorn`, `RamHorn`, `Antler`, `BrokenHorn`, `MassiveHorn`) are just
-parameter sets. Horn sets (`HornPair`, `ThreeHorns`, `CrownOfHorns`,
-`AsymmetricHorns`, `Antlers`, `RamHorns`, `DemonHorns`, `UnicornHorn`) place several horns on skull
-sockets. Every horn starts with a flattened **root blob in the skin role**
-sunk into the skull, so it grows out of the head instead of sitting on it
-like an accessory. Any entry can override params, socket, offset, rotation
-and scale, or swap in a custom mesh:
+**Horns** are sculpted by one sweep builder (`library.py: horn()`): a tapered,
+ridged tube bent along a curve with optional spiral, branches (antlers) and a
+snapped end (broken). Each horn starts with a skin-colored root flare, so it
+grows out of the skull. The eight horn meshes combine into sets in `Sets.lua`
+(HornPair, ThreeHorns, CrownOfHorns, RamHorns, DemonHorns, Antlers,
+AsymmetricHorns, MassiveHorns, UnicornHorn). Any entry can override its socket,
+offset, rotation and scale:
 
 ```lua
-Horns = {
-    "RamHorns",
-    { id = "CurvedHorn", socket = "Brow", rot = {0, 0, 15}, scale = 1.4, params = { broken = 0.4 } },
-    { id = "StraightHorn", socket = "TopL", params = { mesh = "rbxassetid://123", role = "Void" } },
-}
+Horns = { "RamHorns", { id = "BrokenHorn", socket = "Brow", rot = { 0, 0, 15 }, scale = 1.4 } }
 ```
 
-**Disfigurements** are components placed the same way, at any socket on any
-region (`{ id = "GrinMouth", socket = "Palm_R" }` gives a mouth on the palm). Some
-build geometry (tumor clusters, bone protrusions, cracked or blackened flesh,
-extra ears or noses, rib or spine growths). Others only `mutate` proportions
-(oversized hand, elongated or shrunken arm, asymmetric shoulder, enlarged
-muscle). Cracked and blackened flesh are real geometry (dark raised plates
-and fissure strips), not textures.
+**Disfigurements** are real geometry placed at any socket: an eye on the chest, a
+`GrinMouth` on `Palm_R`, a `BoneProtrusion` out of a forearm, `CrackedFlesh`
+with glowing fissures, or tumors. Each surface mesh carries its own swollen
+skin-colored base, lids and rim, so it looks grown into the flesh rather than
+stuck on. Mutations (SwollenHand, ElongatedArm, ShrunkenArm, EnlargedMuscle,
+AsymmetricShoulder) change the body's mass before the meshes build.
+
+What a separate mesh can't do is carve into another mesh. So cavities that open
+the body are sculpted into the **torso itself**: every torso has an `Open`
+variant, and `ChestCavity` (or a transformation) switches to it.
 
 ## 6. How extra limbs are handled
 
-An extra arm, leg or head is a real extra part (`ExtraArm1`, `ExtraLeg2`,
-`ExtraHead1`) with its own **Motor6D** from the Torso at a socket (`FlankR`,
-`BackL`, `ShoulderL`, …). The normal arm, hand, leg, foot or head components
-are then built onto it, so every variant works as an extra limb for free.
+An extra arm, leg or head is an extra invisible bone (`ExtraArm1`…) on its own
+Motor6D from the Torso at a socket. The same arm, hand, leg, foot and head
+meshes are built onto it.
 
-Animation, in order of preference:
-
-1. **Custom animations** can key them directly. The Animation Editor sees the
-   Motor6Ds by name.
-2. By default the client **mirrors** a real joint. Each extra limb's Motor6D
-   has `MirrorJoint` (`"Right Shoulder"`, `"Left Hip"`, `"Neck"`),
-   `MirrorDelay` and `MirrorScale` attributes. `CurseClient` copies that joint's
-   animated Transform, delayed and scaled, so a four-armed Curse swings all four
-   arms when it walks, with a slight lag that reads as organic.
-3. Chains (tails, tendrils, tentacle arms, eye stalks, wing bones) sway
-   procedurally from velocity unless an animation keys them.
-
-Extra limbs are visual. The Humanoid still walks on the two R6 legs, which
-keeps movement, climbing and physics reliable.
+* Custom animations can key those Motor6Ds by name.
+* By default `CurseClient` **mirrors** a real joint's animated Transform onto
+  them (`MirrorJoint`, `MirrorDelay`, `MirrorScale` attributes), so four arms
+  swing when the Curse walks.
+* Tails, wings and tendrils hang on their own joints and sway with speed
+  unless an animation keys them (`AnimationDriven` attribute).
 
 ## 7. How transformations swap geometry
 
-A transformation (`Catalog/Transformations.lua`) is a named set of stages.
-Each stage is a partial appearance **override**:
+A transformation is a set of Partial / Full **overrides** that swap whole
+sculpted components:
 
 ```lua
 {
     id = "SplitMaw", grade = "Grade3",
     stages = {
-        Partial = { Head = "SplitJawHead", Layout = { hunch = 6 } },
+        Partial = { Head = "SplitJawHead" },                          -- the head mesh splits open
         Full = {
-            TorsoGrowths = { add = { "OpenChest" } },
-            Mouths = { add = { { id = "Maw", socket = "Belly", params = { size = 0.45 } } } },
-            Layout = { hunch = 6 },
+            TorsoGrowths = { add = { "ChestCavity" } },                -- torso swaps to its carved-open sculpt
+            Mouths = { add = { { id = "Maw", socket = "Belly" } } },
         },
     },
 }
 ```
 
-Override rules: a plain value replaces the slot. `{ add = … }` and
-`{ remove = … }` edit multi slots. Numbers add limbs.
-
-`CurseBody.setForm(character, "Full")` resolves the effective appearance for
-that stage, **diffs it slot by slot** against what is built, and rebuilds only
-the changed slots and their dependents (a new head rebuilds horns, eyes and
-mouths; a body-type change rebuilds everything). New folders get a `GrowIn`
-attribute and the client scales them in from nothing, which reads as
-anatomy erupting rather than swapping. `CurseService` enforces the grade's
-maximum stage, the optional duration (auto-revert) and whether a form may be
-made permanent (merged into the saved appearance).
+`CurseBody.setForm(character, "Full")` diffs the effective appearance slot by
+slot and rebuilds only what changed and its dependents. New folders get a
+`GrowIn` attribute, and the client scales the new meshes in from nothing.
+`CurseService` enforces the grade's maximum stage, cooldowns and duration.
 
 ## 8. How Curse grades unlock anatomy
 
-Grade is **progression, not decoration**. `Grades.compute(profile)` derives it
-from stats (cursed energy, level, exorcisms; replace the formula with your
-game's). Equipping parts can never raise it.
-
-Grade gates:
+Grade comes from progression (`Grades.compute(profile)`); equipping parts
+never raises it.
 
 | | Grade 4 | Grade 3 | Grade 2 | Grade 1 | Special |
 |---|---|---|---|---|---|
 | Body types | Lean, Normal, Muscular | +Hunched, Heavy | +Deformed | +Monstrous | +Massive |
-| Horns (max) | 2 | 3 | 4 | 6 | 12 |
-| Eyes | 2 | 4 | 8 | 16 | 40 |
-| Mouths | 1 | 2 | 3 | 5 | 12 |
+| Horns / eyes / mouths | 2 / 2 / 1 | 3 / 4 / 2 | 4 / 8 / 3 | 6 / 16 / 5 | 12 / 40 / 12 |
 | Extra arms / legs / heads | 0/0/0 | 1/0/0 | 2/2/0 | 4/4/1 | 8/6/4 |
-| Tails / back parts | 1/0 | 1/1 | 2/2 | 3/4 | 6/8 |
-| Disfigurements | 2 | 4 | 8 | 14 | 30 |
+| Tails / back / disfigurements | 1/0/2 | 1/1/4 | 2/2/8 | 3/4/14 | 6/8/30 |
 | Height | 0.9–1.1 | 0.85–1.2 | 0.8–1.35 | 0.75–1.6 | 0.6–2.2 |
-| Scale tuning | ±10% | ±20% | ±35% | ±60% | ±100% |
-| Transformation | none | Partial | Partial | Full | Full + unique |
+| Transformation | — | Partial | Partial | Full | Full |
 
-Each component also has a minimum grade. Special Grade unlocks anatomy that
-stops being humanoid (`SerpentBody` lower body, `OrbTorso`, headless curses
-with faces on the torso, several heads), not just bigger numbers.
-`Appearance.sanitize(appearance, grade)` runs on the server before every build
-and strips or clamps anything the grade doesn't allow, so a tampered client
-request can't equip locked anatomy.
+Every component also has a minimum grade. Special Grade unlocks anatomy that
+stops being humanoid (`SerpentBody` in place of legs, several heads,
+`MassiveTorso` builds). `Appearance.sanitize` enforces all of this on the
+server before every build.
 
 ## 9. How customization is stored
 
-The appearance is plain JSON-safe data (strings, numbers, arrays and hex
-colors), saved as-is in the player's DataStore profile:
+The appearance is plain JSON-safe data, saved in the player's DataStore profile:
 
 ```lua
 Appearance = {
     Version = 1, Seed = 48213,
     BodyType = "Heavy", Palette = "Crimson", Height = 1.15,
-    Head = "OctopoidHead",
-    Horns = { "HornPair" },
-    Eyes = { { id = "Eye", socket = "EyeL" }, { id = "EyeCluster", socket = "ChestL" } },
-    Mouths = {}, HeadGrowths = {},
-    Torso = "HunchedTorso", TorsoGrowths = { "ChestCavity" },
-    Arms = "MuscularArm", Hands = "Fist", ExtraArms = 2,
-    Legs = "DigitigradeLeg", Feet = "EnlargedFoot",
-    Back = {}, Tails = { "CreatureTail" }, ExtraHeads = {},
-    Disfigurements = { { id = "Mouth", socket = "Hand_R" } },
+    Head = "HuskHead", Horns = { "HornPair" },
+    Eyes = { { id = "EyeCluster", socket = "ChestL" } },
+    Torso = "HuskTorso", TorsoGrowths = { "ChestCavity" },
+    Arms = "HuskArm", Hands = "Fist", ExtraArms = 2,
+    Legs = "DigitigradeLeg", Feet = "TalonFoot",
+    Tails = { "BoneTail" },
+    Disfigurements = { { id = "GrinMouth", socket = "Palm_R", scale = 0.6 } },
     Scales = { Hands = 1.2 },
     Transformation = "SplitMaw",
 }
 ```
 
-* A missing slot means "use the component's defaults" (a head brings its own
-  eyes and mouth). An explicit `{}` means none.
-* `Seed` drives all procedural asymmetry, so a Curse looks the same on every
-  server and every rebuild.
-* `Version` plus `Appearance.migrate` keep old saves loading after renames.
-* The built character carries the resolved appearance as a JSON attribute
-  (`CurseAppearance`) plus `CurseGrade` and `CurseForm`, for UI and other
-  systems.
+A missing multi slot means "use the head's defaults", and `{}` means none.
+`Palette` is a name or a table of role colors. `Appearance.migrate` keeps old
+saves loading.
 
 ## 10. How the system expands
 
-* **New part:** add an entry to any `Catalog/*.lua` module, or drop a new
-  ModuleScript into `Catalog/`, which is auto-loaded. Nothing in the core
-  changes.
-* **New look for an existing part:** register a new id with different
-  `params` (most horns, arms and tails are parameter sets over one builder).
-* **Hand-made art:** put MeshParts in `CurseBody/Assets` and use
-  `ctx:template`, or give a horn or part a `mesh` param.
-* **New slot:** add a row to `Slots.lua` (region, folder, kind, order,
-  dependents, default) and a cap to `Grades.lua`.
-* **New body type, palette or transformation:** one table entry each.
-* **Validation:** `tests/run.py` builds every preset and random appearances
-  under a mocked Roblox API, checks every component builds at every grade, and
-  renders previews, so a broken catalog entry is caught before it reaches
-  Studio.
+1. **New body part:** write a sculpt function in `tools/sculpt/library.py` with
+   `@component(id, slot, grade, space, sockets=…)`, then run
+   `python3 tools/sculpt/library.py --only YourPart`.
+2. **Import it:** import the updated `assets/meshes/library/Curse<Slot>.obj` into
+   `CurseAssets`. The manifest registers it automatically, with no Luau changes.
+3. **Combinations:** horn sets, pairs and clusters are a few lines in `Sets.lua`.
+4. **Hand-made art:** any MeshPart named `<Id>_<Role>` in `CurseAssets` with a
+   manifest entry works the same way, so artists can replace a procedural sculpt
+   with a Blender model.
+5. **New slot, body type, palette or transformation:** one table entry each.
+6. **Validation:** `tests/run.py` builds every preset, transformation and
+   component and 40 random Curses under a mocked Roblox API. It then renders
+   them from the real library meshes (`previews/curse/`).

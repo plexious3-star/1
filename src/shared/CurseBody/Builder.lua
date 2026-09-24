@@ -276,6 +276,83 @@ function Builder:mesh(target, pos, size, rot, meshId, role, textureId, meshScale
 	return p
 end
 
+---------------------------------------------------------------------------- sculpted meshes
+
+--[[
+	Imported mesh library. Import the OBJ files from assets/meshes/library/ into Studio and
+	put the resulting models (or loose MeshParts) in ReplicatedStorage.CurseAssets (or
+	CurseBody/Assets). Pieces are found by name anywhere under that folder.
+]]
+local assetIndex = nil
+local missing = {}
+
+local function findAssetRoot()
+	local rs = game:GetService("ReplicatedStorage")
+	return rs:FindFirstChild("CurseAssets") or script.Parent:FindFirstChild("Assets")
+end
+
+function Builder.indexAssets(root)
+	assetIndex = {}
+	root = root or findAssetRoot()
+	if root then
+		for _, d in ipairs(root:GetDescendants()) do
+			if d:IsA("MeshPart") and not assetIndex[d.Name] then
+				assetIndex[d.Name] = d
+			end
+		end
+	end
+	return assetIndex
+end
+
+function Builder.asset(name)
+	if not assetIndex then
+		Builder.indexAssets()
+	end
+	return assetIndex[name]
+end
+
+-- Rotation applied to every library mesh (fix-up if an importer changed the axes).
+Builder.MESH_ROTATION = CFrame.identity
+
+--[[
+	Place one library piece. `offset` is the piece center in the anchor's space for the
+	RIGHT side; on the left side (ctx.side < 0) the "_L" mirrored piece is used and X is
+	mirrored. `size` is the final size (already scaled).
+]]
+function Builder:mesh(target, pieceName, offset, size, role, sided)
+	local anchor = self:anchor(target)
+	local name = pieceName
+	if sided and self.side < 0 then
+		name = pieceName .. "_L"
+	end
+	local source = Builder.asset(name)
+	if not source then
+		if not missing[name] then
+			missing[name] = true
+			warn("[CurseBody] mesh piece not imported: " .. name .. " (see assets/meshes/library)")
+		end
+		return nil
+	end
+	local p = source:Clone()
+	self.count += 1
+	p.Name = self.owner .. "_" .. name
+	p:SetAttribute("MeshName", name)
+	p:SetAttribute("Role", role)
+	p.Size = Vector3.new(math.max(size.X, MIN_SIZE), math.max(size.Y, MIN_SIZE), math.max(size.Z, MIN_SIZE))
+	local look = self:look(role)
+	p.Color, p.Material, p.Transparency = look.Color, look.Material, look.Transparency
+	for _, child in ipairs(p:GetChildren()) do
+		if child:IsA("JointInstance") or child:IsA("WeldConstraint") then
+			child:Destroy()
+		end
+	end
+	local x, y, z = offset.X, offset.Y, offset.Z
+	if self.side < 0 then
+		x = -x
+	end
+	return self:attach(p, anchor, anchor.cf * CFrame.new(x, y, z) * Builder.MESH_ROTATION)
+end
+
 -- Clone a MeshPart / Model from CurseBody/Assets and weld it (hand-made art).
 function Builder:template(assetName, target, pos, rot, role)
 	local assets = script.Parent:FindFirstChild("Assets")

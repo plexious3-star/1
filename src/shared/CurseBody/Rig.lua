@@ -138,8 +138,28 @@ end
 	head low and forward and its arms hang in front, in every animation.
 	Returns torso-local positions plus the "spine" frame torso components build in.
 ]]
-function Rig.computeLayout(body)
+function Rig.computeLayout(body, meshLayout)
 	local m, L = body.mass, body.layout
+	if meshLayout then
+		-- Sculpted torsos carry their own joint positions (posture is part of the sculpt);
+		-- they scale with the torso mesh.
+		local W, H, D = Rig.meshScale(m.TorsoW), Rig.meshScale(m.TorsoH), Rig.meshScale(m.TorsoD)
+		local function sc(v)
+			return Vector3.new(v[1] * W, v[2] * H, v[3] * D)
+		end
+		local layout = {
+			spine = CFrame.new(0, -1, 0),
+			legExtra = (meshLayout.legExtra or 0) + L.legExtra,
+			neck = sc(meshLayout.neck) + Vector3.new(0, -L.neckDrop, -L.neckForward),
+			tailRoot = sc(meshLayout.tailRoot or { 0, -0.8, 0.45 }),
+		}
+		local sh, hip = meshLayout.shoulder, meshLayout.hip
+		layout.shoulderRight = sc(sh) + Vector3.new(0, -L.shoulderDrop, -L.shoulderForward)
+		layout.shoulderLeft = Vector3.new(-layout.shoulderRight.X, layout.shoulderRight.Y, layout.shoulderRight.Z)
+		layout.hipRight = Vector3.new(hip[1] * W + L.hipSpread, hip[2], hip[3] * D)
+		layout.hipLeft = Vector3.new(-layout.hipRight.X, hip[2], hip[3] * D)
+		return layout
+	end
 	local spine = CFrame.new(0, -1, 0) * CFrame.Angles(math.rad(-L.hunch), 0, 0)
 	local H = m.TorsoH
 	local layout = { spine = spine, legExtra = L.legExtra }
@@ -159,6 +179,11 @@ function Rig.computeLayout(body)
 		layout["hip" .. sideName] = Vector3.new(s * (1 + (legThick - 1) * 0.45 + L.hipSpread), -1, 0)
 	end
 	return layout
+end
+
+-- Mesh scale from body mass: sub-linear, so heavy builds stay anatomical instead of stretched.
+function Rig.meshScale(mass)
+	return (mass or 1) ^ 0.75
 end
 
 function Rig.applyLayout(character, layout)

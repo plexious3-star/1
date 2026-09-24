@@ -22,7 +22,7 @@ Slots.list = {
 		dependents = { "Horns", "Eyes", "Mouths", "HeadGrowths", "Disfigurements" } },
 	{ name = "Arms", region = "Arms", folder = "ArmVariant", kind = "sided", order = 30, default = "NormalArm",
 		dependents = { "Hands", "ExtraArms", "Disfigurements" } },
-	{ name = "Hands", region = "Arms", folder = "HandVariant", kind = "sided", order = 35, default = "Hand",
+	{ name = "Hands", region = "Arms", folder = "HandVariant", kind = "sided", order = 35, default = "OpenHand",
 		dependents = { "ExtraArms", "Disfigurements" } },
 	{ name = "Legs", region = "Legs", folder = "LegVariant", kind = "sided", order = 40, default = "NormalLeg",
 		dependents = { "Feet", "ExtraLegs", "Disfigurements" } },

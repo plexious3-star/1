@@ -744,11 +744,13 @@ function MOCK.dump(model)
 			end
 			local mesh = p:FindFirstChildOfClass("SpecialMesh")
 			local shape = "Block"
-			if p.ClassName == "WedgePart" then
+			if p.ClassName == "MeshPart" then
+				shape = "Mesh"
+			elseif p.ClassName == "WedgePart" then
 				shape = "Wedge"
 			elseif mesh and mesh.MeshType.Name == "Sphere" then
 				shape = "Ball"
-			elseif p.Shape.Name == "Cylinder" then
+			elseif p.ClassName == "Part" and p.Shape.Name == "Cylinder" then
 				shape = "Cylinder"
 			elseif mesh then
 				shape = "Mesh"
@@ -757,6 +759,7 @@ function MOCK.dump(model)
 			table.insert(out, {
 				n = p.Name, s = shape, sz = { s.X, s.Y, s.Z }, cf = { w:GetComponents() },
 				c = { p.Color.R, p.Color.G, p.Color.B }, m = p.Material.Name, t = p.Transparency,
+				mesh = p:GetAttribute("MeshName"),
 			})
 		end
 	end

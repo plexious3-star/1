@@ -1,4 +1,4 @@
-<roblox xmlns:xmime="http://www.w3.org/2005/05/xmlmime" version="4"><Item class="LocalScript" referent="RBX21"><Properties><string name="Name">CurseClient</string><ProtectedString name="Source"><![CDATA[--!nonstrict
+<roblox xmlns:xmime="http://www.w3.org/2005/05/xmlmime" version="4"><Item class="LocalScript" referent="RBX18"><Properties><string name="Name">CurseClient</string><ProtectedString name="Source"><![CDATA[--!nonstrict
 --[[
 	CurseClient — per-client motion for every Curse in the game.
 

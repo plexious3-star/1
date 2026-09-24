@@ -1,4 +1,4 @@
-<roblox xmlns:xmime="http://www.w3.org/2005/05/xmlmime" version="4"><Item class="Script" referent="RBX20"><Properties><string name="Name">CurseService</string><ProtectedString name="Source"><![CDATA[--!nonstrict
+<roblox xmlns:xmime="http://www.w3.org/2005/05/xmlmime" version="4"><Item class="Script" referent="RBX17"><Properties><string name="Name">CurseService</string><ProtectedString name="Source"><![CDATA[--!nonstrict
 --[[
 	CurseService — server runtime for player Curses.
 

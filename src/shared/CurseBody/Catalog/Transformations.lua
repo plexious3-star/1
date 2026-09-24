@@ -1,11 +1,13 @@
 --!nonstrict
 --[[
 	Transformations: named Partial / Full stages, each a partial appearance override.
-	  plain value           replaces the slot            Head = "SplitJawHead"
-	  { add = …, remove = … }  edits a multi/limb slot    ExtraArms = { add = 2 }
-	  Scales = { … }        multiplies                    Scales = { Arms = 1.2 }
-	  Layout = { … }        adds to posture               Layout = { hunch = 10 }
-	  Height = { mul = x }  multiplies height
+	They swap whole sculpted components (a new head mesh, an opened torso mesh, extra limb
+	meshes), not colors.
+	  plain value              replaces the slot            Head = "SplitJawHead"
+	  { add = …, remove = … }  edits a multi/limb slot      ExtraArms = { add = 2 }
+	  Scales = { … }           multiplies                   Scales = { Arms = 1.2 }
+	  Layout = { … }           adds to posture              Layout = { neckDrop = 0.1 }
+	  Height = { mul = x }     multiplies height
 	Full inherits Partial unless Full.inherit == false. Grades cap which stage is usable.
 ]]
 
@@ -13,13 +15,12 @@ return {
 	{
 		id = "SplitMaw",
 		grade = "Grade3",
-		description = "The head splits open into a maw; at full power the chest tears open too.",
+		description = "The head splits open into a toothed maw; at full power the chest tears open too.",
 		stages = {
-			Partial = { Head = "SplitJawHead", Layout = { hunch = 6 } },
+			Partial = { Head = "SplitJawHead" },
 			Full = {
-				TorsoGrowths = { add = { "OpenChest" } },
-				Mouths = { add = { { id = "Maw", socket = "Belly", params = { size = 0.45 } } } },
-				Layout = { hunch = 6 },
+				TorsoGrowths = { add = { "ChestCavity" } },
+				Mouths = { add = { { id = "Maw", socket = "Belly", scale = 0.8 } } },
 			},
 		},
 	},
@@ -35,10 +36,13 @@ return {
 	{
 		id = "OpenChest",
 		grade = "Grade3",
-		description = "The torso opens and reveals a black cavity, then its organs.",
+		description = "The torso opens and reveals a black cavity; ribs burst out of the flanks.",
 		stages = {
 			Partial = { TorsoGrowths = { add = { "ChestCavity" } } },
-			Full = { TorsoGrowths = { remove = { "ChestCavity" }, add = { "ExposedOrgans", "RibGrowth" } } },
+			Full = {
+				TorsoGrowths = { add = { { id = "RibGrowth", socket = "FlankR" }, { id = "RibGrowth", socket = "FlankL" } } },
+				Mouths = { add = { { id = "Maw", socket = "Belly", scale = 0.7 } } },
+			},
 		},
 	},
 	{
@@ -46,7 +50,7 @@ return {
 		grade = "Grade2",
 		description = "Fingers harden into blades; a bladed tail and spines follow.",
 		stages = {
-			Partial = { Hands = "BladedFingers" },
+			Partial = { Hands = "BladedHand" },
 			Full = { Tails = { add = { "BladeTail" } }, Back = { add = { "Spikes" } } },
 		},
 	},
@@ -55,11 +59,8 @@ return {
 		grade = "Grade2",
 		description = "Eyes open across the body.",
 		stages = {
-			Partial = { Eyes = { add = { { id = "EyeCluster", socket = "ChestR", params = { count = 3 } } } } },
-			Full = {
-				Eyes = { add = { { id = "EyeCluster", socket = "ChestL", params = { count = 3 } } } },
-				Back = { add = { "BackEyes" } },
-			},
+			Partial = { Eyes = { add = { { id = "EyeCluster", socket = "ChestR" } } } },
+			Full = { Eyes = { add = { { id = "EyeCluster", socket = "ChestL" } } }, Back = { add = { "BackEyes" } } },
 		},
 	},
 	{
@@ -67,11 +68,11 @@ return {
 		grade = "Grade1",
 		description = "Mass floods the body: bigger frame, massive horns, bone wings.",
 		stages = {
-			Partial = { Scales = { Torso = 1.12, Arms = 1.2, Hands = 1.2, Shoulders = 1.2 }, Layout = { hunch = 6 } },
+			Partial = { Scales = { Torso = 1.12, Arms = 1.2, Hands = 1.2, Shoulders = 1.2 } },
 			Full = {
-				BodyType = "Monstrous",
-				Height = { mul = 1.2 },
-				Horns = { remove = "all", add = { { id = "MassiveHorn", socket = "TopR" }, { id = "MassiveHorn", socket = "TopL" } } },
+				Torso = "MassiveTorso",
+				Height = { mul = 1.15 },
+				Horns = { remove = "all", add = { "MassiveHorns" } },
 				Back = { add = { "BoneWings" } },
 			},
 		},
@@ -86,7 +87,7 @@ return {
 				Legs = "SerpentBody",
 				ExtraHeads = { add = 2 },
 				ExtraArms = { add = 2 },
-				Eyes = { add = { { id = "EyeCluster", socket = "Belly", params = { count = 6 } } } },
+				Eyes = { add = { { id = "EyeCluster", socket = "Belly" } } },
 			},
 		},
 	},
