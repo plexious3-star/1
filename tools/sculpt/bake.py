@@ -1,6 +1,6 @@
 """Bake a sculpted creature into Roblox-ready meshes.
 
-    python3 tools/sculpt/bake.py husk [--fast] [--no-render]
+    python3 tools/sculpt/bake.py husk [--fast] [--no-render] [--budget 0.25]
 
 Outputs (assets/meshes/<Name>/):
     <Bone>_<material>.obj   one MeshPart each, vertices relative to the piece's own center
@@ -29,7 +29,7 @@ def safe(name):
     return name.replace(" ", "")
 
 
-def bake(mod, fast=False, textured=True):
+def bake(mod, fast=False, textured=True, budget=1.0):
     sculpt = mod.build()
     out_dir = os.path.join(ROOT, "assets", "meshes", mod.NAME)
     os.makedirs(out_dir, exist_ok=True)
@@ -41,7 +41,8 @@ def bake(mod, fast=False, textured=True):
     for bone in sculpt.ops:
         t0 = time.time()
         voxel = mod.VOXEL.get(bone, 0.025) * (1.8 if fast else 1.0)
-        verts, faces, normals, face_mat = mesh_bone(sculpt, bone, voxel=voxel, max_tris=mod.MAX_TRIS.get(bone, 8000))
+        verts, faces, normals, face_mat = mesh_bone(sculpt, bone, voxel=voxel,
+                                                    max_tris=int(mod.MAX_TRIS.get(bone, 8000) * budget))
         bone_center = np.asarray(mod.BONES[bone], float)
         border = texture.border_flags(faces, face_mat, len(verts))
         sdf = (lambda q, b=bone: sculpt.evaluate(b, q)[0])
@@ -176,6 +177,7 @@ def previews(mod, pieces):
 
 if __name__ == "__main__":
     mod = importlib.import_module("sculpt." + sys.argv[1])
-    manifest, pieces = bake(mod, fast="--fast" in sys.argv, textured="--no-texture" not in sys.argv)
+    budget = float(sys.argv[sys.argv.index("--budget") + 1]) if "--budget" in sys.argv else 1.0
+    manifest, pieces = bake(mod, fast="--fast" in sys.argv, textured="--no-texture" not in sys.argv, budget=budget)
     if "--no-render" not in sys.argv:
         previews(mod, pieces)
