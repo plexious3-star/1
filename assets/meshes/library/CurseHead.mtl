@@ -38,11 +38,6 @@ Kd 1 1 1
 d 1
 map_Kd textures/BeastHead_SkinLight.png
 
-newmtl BeastHead_Teeth
-Kd 1 1 1
-d 1
-map_Kd textures/BeastHead_Teeth.png
-
 newmtl BeastHead_Void
 Kd 1 1 1
 d 1

@@ -1,6 +1,6 @@
 """The Curse mesh library: every modular body part as a sculpted, organic mesh.
 
-    python3 tools/sculpt/library.py [--fast] [--only Id,Id] [--no-render]
+    python3 tools/sculpt/library.py [--fast] [--only Id,Id] [--no-render] [--budget 0.25]
 
 Each component is sculpted in its OWN local space (see "spaces" below), baked to
 meshes split by palette role, and described in a generated manifest
@@ -915,6 +915,12 @@ def shell(S, T):
 
 
 # ============================================================================ bake
+# Triangle budget: fraction of each component's authored `tris`. 0.25 keeps the silhouette
+# and (with the textures carrying fine detail) looks near-identical to full detail, while
+# putting a typical Curse around 13–22k triangles. MIN_TRIS keeps tiny parts round.
+BUDGET = 0.25
+MIN_TRIS = 300
+
 def sculpt_component(c):
     S = Sculpt(c["id"])
     name = c["id"]
@@ -932,7 +938,8 @@ def auto_voxel(S, name, want):
     return float(np.clip(ext / 120, 0.005, 0.03))
 
 
-def bake_all(only=None, fast=False, render=True):
+def bake_all(only=None, fast=False, render=True, budget=None):
+    budget = BUDGET if budget is None else budget
     from PIL import Image, ImageDraw
     from sculpt import raster
 
@@ -951,7 +958,8 @@ def bake_all(only=None, fast=False, render=True):
         t0 = time.time()
         S = sculpt_component(c)
         voxel = auto_voxel(S, cid, c.get("voxel")) * (1.7 if fast else 1.0)
-        verts, faces, normals, face_mat = mesh_bone(S, cid, voxel=voxel, max_tris=c.get("tris", 4000), smooth_iters=8)
+        max_tris = max(MIN_TRIS, int(c.get("tris", 4000) * budget))
+        verts, faces, normals, face_mat = mesh_bone(S, cid, voxel=voxel, max_tris=max_tris, smooth_iters=8)
         roles = c.get("roles", {})
         pieces, meshes = [], []
         border = texture.border_flags(faces, face_mat, len(verts))
@@ -1150,4 +1158,5 @@ if __name__ == "__main__":
     only = None
     if "--only" in sys.argv:
         only = set(sys.argv[sys.argv.index("--only") + 1].split(","))
-    bake_all(only=only, fast="--fast" in sys.argv, render="--no-render" not in sys.argv)
+    budget = float(sys.argv[sys.argv.index("--budget") + 1]) if "--budget" in sys.argv else None
+    bake_all(only=only, fast="--fast" in sys.argv, render="--no-render" not in sys.argv, budget=budget)

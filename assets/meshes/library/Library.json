@@ -6,34 +6,34 @@
     {
      "name": "Antler_BoneDark",
      "offset": [
-      0.1973,
-      0.6799,
-      0.24
+      0.1977,
+      0.6782,
+      0.214
      ],
      "role": "BoneDark",
      "size": [
-      0.643,
-      1.6136,
-      0.7271
+      0.644,
+      1.6124,
+      0.6827
      ],
      "texture": "Antler_BoneDark.png",
-     "tris": 2285
+     "tris": 567
     },
     {
      "name": "Antler_Skin",
      "offset": [
-      0.0006,
-      -0.0551,
-      0.0009
+      0.0028,
+      -0.0535,
+      0.0011
      ],
      "role": "Skin",
      "size": [
-      0.2551,
-      0.1308,
-      0.2554
+      0.2558,
+      0.1489,
+      0.2569
      ],
      "texture": "Antler_Skin.png",
-     "tris": 215
+     "tris": 57
     }
    ],
    "sided": true,
@@ -51,66 +51,66 @@
     {
      "name": "BackHorn_Bone",
      "offset": [
-      0.1105,
-      0.2851,
-      0.6153
+      0.1133,
+      0.2902,
+      0.6313
      ],
      "role": "Bone",
      "size": [
-      0.3914,
-      0.386,
-      1.0061
+      0.3945,
+      0.3805,
+      1.0378
      ],
      "texture": "BackHorn_Bone.png",
-     "tris": 1294
+     "tris": 326
     },
     {
      "name": "BackHorn_BoneDark",
      "offset": [
-      -0.0008,
-      0.0566,
-      0.0449
+      -0.0135,
+      0.0664,
+      0.0504
      ],
      "role": "BoneDark",
      "size": [
-      0.3088,
-      0.4295,
-      0.4354
+      0.2991,
+      0.4466,
+      0.4657
      ],
      "texture": "BackHorn_BoneDark.png",
-     "tris": 550
+     "tris": 144
     },
     {
      "name": "BackHorn_Claw",
      "offset": [
-      0.27,
-      0.4208,
-      1.0792
+      0.2906,
+      0.4102,
+      1.0621
      ],
      "role": "Claw",
      "size": [
-      0.1296,
-      0.0964,
-      0.2559
+      0.0885,
+      0.0799,
+      0.2891
      ],
      "texture": "BackHorn_Claw.png",
-     "tris": 180
+     "tris": 29
     },
     {
      "name": "BackHorn_Skin",
      "offset": [
-      -0.0,
-      -0.0501,
-      -0.0007
+      -0.0002,
+      -0.0506,
+      0.0004
      ],
      "role": "Skin",
      "size": [
-      0.3628,
-      0.1826,
-      0.3666
+      0.3693,
+      0.2126,
+      0.3675
      ],
      "texture": "BackHorn_Skin.png",
-     "tris": 476
+     "tris": 125
     }
    ],
    "sided": true,
@@ -141,98 +141,82 @@
     {
      "name": "BeastHead_Skin",
      "offset": [
-      -0.002,
-      0.0365,
-      -0.1926
+      -0.0023,
+      0.037,
+      -0.1925
      ],
      "role": "Skin",
      "size": [
-      1.0353,
-      1.3316,
-      1.9537
+      1.0357,
+      1.3349,
+      1.953
      ],
      "texture": "BeastHead_Skin.png",
-     "tris": 3299
+     "tris": 853
     },
     {
      "name": "BeastHead_SkinDark",
      "offset": [
-      0.0012,
-      0.2626,
-      -0.24
+      0.0009,
+      0.2621,
+      -0.2374
      ],
      "role": "SkinDark",
      "size": [
-      1.0387,
-      1.6617,
-      1.6125
+      1.0385,
+      1.66,
+      1.6031
      ],
      "texture": "BeastHead_SkinDark.png",
-     "tris": 1601
+     "tris": 388
     },
     {
      "name": "BeastHead_SkinDeep",
      "offset": [
-      0.0036,
-      0.2716,
-      -0.3452
+      -0.0049,
+      0.2702,
+      -0.3481
      ],
      "role": "SkinDeep",
      "size": [
-      0.7861,
-      0.2142,
-      0.2135
+      0.7853,
+      0.2335,
+      0.2197
      ],
      "texture": "BeastHead_SkinDeep.png",
-     "tris": 319
+     "tris": 84
     },
     {
      "name": "BeastHead_SkinLight",
      "offset": [
-      0.002,
-      0.2534,
-      -0.4904
+      0.0023,
+      0.2605,
+      -0.505
      ],
      "role": "SkinLight",
      "size": [
-      0.7999,
-      0.378,
-      0.5256
+      0.7997,
+      0.4115,
+      0.518
      ],
      "texture": "BeastHead_SkinLight.png",
-     "tris": 503
-    },
-    {
-     "name": "BeastHead_Teeth",
-     "offset": [
-      0.0009,
-      -0.2535,
-      -0.5343
-     ],
-     "role": "Teeth",
-     "size": [
-      0.3778,
-      0.0867,
-      0.3758
-     ],
-     "texture": "BeastHead_Teeth.png",
-     "tris": 196
+     "tris": 131
     },
     {
      "name": "BeastHead_Void",
      "offset": [
-      -0.0022,
-      -0.1847,
-      -0.6853
+      -0.0031,
+      -0.1842,
+      -0.6867
      ],
      "role": "Void",
      "size": [
-      0.4879,
-      0.2743,
-      0.8475
+      0.4958,
+      0.2789,
+      0.8565
      ],
      "texture": "BeastHead_Void.png",
-     "tris": 1080
+     "tris": 292
     }
    ],
    "sided": false,
@@ -442,50 +426,50 @@
     {
      "name": "BladeTail_Bone",
      "offset": [
-      0.1173,
-      -0.2785,
-      1.3336
+      0.1287,
+      -0.3462,
+      1.5351
      ],
      "role": "Bone",
      "size": [
-      0.1721,
-      0.635,
-      1.2046
+      0.1238,
+      0.4969,
+      0.7968
      ],
      "texture": "BladeTail_Bone.png",
-     "tris": 123
+     "tris": 23
     },
     {
      "name": "BladeTail_Claw",
      "offset": [
-      0.2006,
-      -0.9809,
-      2.559
+      0.2004,
+      -0.9846,
+      2.5603
      ],
      "role": "Claw",
      "size": [
-      0.149,
-      0.416,
-      0.8298
+      0.1487,
+      0.4104,
+      0.8252
      ],
      "texture": "BladeTail_Claw.png",
-     "tris": 531
+     "tris": 118
     },
     {
      "name": "BladeTail_Skin",
      "offset": [
-      0.0191,
-      -0.3658,
-      1.0184
+      0.0181,
+      -0.3721,
+      1.0201
      ],
      "role": "Skin",
      "size": [
-      0.5196,
-      1.2126,
-      2.5167
+      0.5212,
+      1.224,
+      2.5204
      ],
      "texture": "BladeTail_Skin.png",
-     "tris": 2846
+     "tris": 733
     }
    ],
    "sided": false,
@@ -503,50 +487,50 @@
     {
      "name": "BladedHand_Claw",
      "offset": [
-      0.0001,
-      -0.9671,
-      -0.0051
+      0.0002,
+      -0.9122,
+      -0.0068
      ],
      "role": "Claw",
      "size": [
-      0.0808,
-      0.9542,
-      0.5282
+      0.0885,
+      0.8022,
+      0.5284
      ],
      "texture": "BladedHand_Claw.png",
-     "tris": 1190
+     "tris": 309
     },
     {
      "name": "BladedHand_Skin",
      "offset": [
-      -0.0456,
-      -0.3147,
-      -0.0579
+      -0.0472,
+      -0.3148,
+      -0.0551
      ],
      "role": "Skin",
      "size": [
-      0.3942,
-      0.6721,
-      0.6169
+      0.3985,
+      0.6715,
+      0.625
      ],
      "texture": "BladedHand_Skin.png",
-     "tris": 2133
+     "tris": 541
     },
     {
      "name": "BladedHand_SkinLight",
      "offset": [
-      0.0521,
-      -0.3819,
-      0.0014
+      0.0277,
+      -0.3773,
+      0.0167
      ],
      "role": "SkinLight",
      "size": [
-      0.1268,
-      0.1463,
-      0.4975
+      0.1338,
+      0.1498,
+      0.4679
      ],
      "texture": "BladedHand_SkinLight.png",
-     "tris": 175
+     "tris": 24
     }
    ],
    "sided": true,
@@ -563,50 +547,50 @@
     {
      "name": "BoneArm_Bone",
      "offset": [
-      -0.3484,
-      -0.3863,
-      0.0111
+      -0.3506,
+      -0.3919,
+      0.0098
      ],
      "role": "Bone",
      "size": [
-      0.3335,
-      1.2911,
-      0.3054
+      0.31,
+      1.3165,
+      0.2949
      ],
      "texture": "BoneArm_Bone.png",
-     "tris": 1105
+     "tris": 263
     },
     {
      "name": "BoneArm_BoneDark",
      "offset": [
-      -0.3162,
-      -0.6811,
-      -0.0093
+      -0.3171,
+      -0.6663,
+      -0.0106
      ],
      "role": "BoneDark",
      "size": [
-      0.2779,
-      0.8966,
-      0.3815
+      0.2765,
+      0.9228,
+      0.3832
      ],
      "texture": "BoneArm_BoneDark.png",
-     "tris": 1205
+     "tris": 314
     },
     {
      "name": "BoneArm_SkinDark",
      "offset": [
-      -0.4,
-      0.2358,
-      -0.0
+      -0.4004,
+      0.24,
+      0.0005
      ],
      "role": "SkinDark",
      "size": [
       0.6006,
-      1.0487,
-      0.6004
+      1.0403,
+      0.6028
      ],
      "texture": "BoneArm_SkinDark.png",
-     "tris": 2690
+     "tris": 671
     }
    ],
    "pivot": [
@@ -702,66 +686,66 @@
     {
      "name": "BoneProtrusion_Bone",
      "offset": [
-      0.0109,
-      0.2289,
-      0.0298
+      0.0172,
+      0.2331,
+      0.0367
      ],
      "role": "Bone",
      "size": [
-      0.188,
-      0.7387,
-      0.237
+      0.1988,
+      0.7485,
+      0.2311
      ],
      "texture": "BoneProtrusion_Bone.png",
-     "tris": 682
+     "tris": 174
     },
     {
      "name": "BoneProtrusion_BoneDark",
      "offset": [
-      0.08,
-      0.5945,
-      0.1202
+      0.0814,
+      0.5958,
+      0.1192
      ],
      "role": "BoneDark",
      "size": [
-      0.0703,
-      0.0808,
-      0.0706
+      0.0704,
+      0.0819,
+      0.0691
      ],
      "texture": "BoneProtrusion_BoneDark.png",
-     "tris": 119
+     "tris": 34
     },
     {
      "name": "BoneProtrusion_Flesh",
      "offset": [
-      0.0001,
-      0.045,
-      0.0016
+      0.001,
+      0.0417,
+      0.0012
      ],
      "role": "Flesh",
      "size": [
-      0.4307,
-      0.0792,
-      0.4335
+      0.4256,
+      0.0783,
+      0.4307
      ],
      "texture": "BoneProtrusion_Flesh.png",
-     "tris": 589
+     "tris": 144
     },
     {
      "name": "BoneProtrusion_SkinDark",
      "offset": [
-      -0.0001,
-      -0.0333,
+      -0.0009,
+      -0.0386,
       0.0002
      ],
      "role": "SkinDark",
      "size": [
-      0.4788,
-      0.1818,
-      0.4783
+      0.4779,
+      0.1873,
+      0.4793
      ],
      "texture": "BoneProtrusion_SkinDark.png",
-     "tris": 1110
+     "tris": 272
     }
    ],
    "sided": false,
@@ -779,50 +763,50 @@
     {
      "name": "BoneSpur_Bone",
      "offset": [
-      -0.0002,
-      0.261,
-      0.05
+      0.001,
+      0.2755,
+      0.0496
      ],
      "role": "Bone",
      "size": [
-      0.1003,
-      0.297,
-      0.1477
+      0.0977,
+      0.2684,
+      0.1446
      ],
      "texture": "BoneSpur_Bone.png",
-     "tris": 426
+     "tris": 109
     },
     {
      "name": "BoneSpur_BoneDark",
      "offset": [
-      -0.0024,
-      0.0326,
-      -0.0008
+      -0.0005,
+      0.0414,
+      -0.0034
      ],
      "role": "BoneDark",
      "size": [
-      0.2004,
-      0.301,
-      0.1975
+      0.2216,
+      0.3215,
+      0.219
      ],
      "texture": "BoneSpur_BoneDark.png",
-     "tris": 504
+     "tris": 121
     },
     {
      "name": "BoneSpur_Skin",
      "offset": [
-      0.0001,
-      -0.0509,
-      -0.0
+      0.0006,
+      -0.0462,
+      0.0016
      ],
      "role": "Skin",
      "size": [
-      0.2296,
-      0.1218,
-      0.2295
+      0.2286,
+      0.1375,
+      0.2298
      ],
      "texture": "BoneSpur_Skin.png",
-     "tris": 568
+     "tris": 144
     }
    ],
    "sided": false,
@@ -844,50 +828,50 @@
     {
      "name": "BoneTail_Bone",
      "offset": [
-      0.0329,
-      -0.5684,
-      0.9008
+      0.0303,
+      -0.5726,
+      0.8938
      ],
      "role": "Bone",
      "size": [
-      0.4468,
-      1.4774,
-      2.1835
+      0.4476,
+      1.4612,
+      2.1728
      ],
      "texture": "BoneTail_Bone.png",
-     "tris": 3226
+     "tris": 790
     },
     {
      "name": "BoneTail_BoneDark",
      "offset": [
-      0.0793,
-      -0.4274,
-      1.0271
+      0.0655,
+      -0.4606,
+      1.0291
      ],
      "role": "BoneDark",
      "size": [
-      0.2848,
-      1.6274,
-      2.0719
+      0.3614,
+      1.6809,
+      2.0705
      ],
      "texture": "BoneTail_BoneDark.png",
-     "tris": 533
+     "tris": 136
     },
     {
      "name": "BoneTail_SkinDark",
      "offset": [
-      0.145,
-      -1.1069,
-      1.7662
+      0.126,
+      -1.0854,
+      1.7518
      ],
      "role": "SkinDark",
      "size": [
-      0.1826,
-      0.6428,
-      0.5301
+      0.2506,
+      0.6879,
+      0.558
      ],
      "texture": "BoneTail_SkinDark.png",
-     "tris": 241
+     "tris": 74
     }
    ],
    "sided": false,
@@ -906,50 +890,50 @@
     {
      "name": "BoneWing_Bone",
      "offset": [
-      1.3612,
-      0.3235,
-      0.5652
+      1.3829,
+      0.3291,
+      0.5557
      ],
      "role": "Bone",
      "size": [
-      2.5812,
-      2.0769,
-      1.0971
+      2.5767,
+      2.093,
+      1.1028
      ],
      "texture": "BoneWing_Bone.png",
-     "tris": 3157
+     "tris": 760
     },
     {
      "name": "BoneWing_BoneDark",
      "offset": [
-      2.1205,
-      0.3713,
-      0.9308
+      2.1146,
+      0.372,
+      0.9319
      ],
      "role": "BoneDark",
      "size": [
-      1.2706,
-      2.269,
-      0.3931
+      1.2582,
+      2.2598,
+      0.3892
      ],
      "texture": "BoneWing_BoneDark.png",
-     "tris": 163
+     "tris": 34
     },
     {
      "name": "BoneWing_Skin",
      "offset": [
-      0.006,
-      0.0497,
-      0.0502
+      0.005,
+      0.0492,
+      0.0481
      ],
      "role": "Skin",
      "size": [
-      0.5332,
-      0.4794,
-      0.5613
+      0.5299,
+      0.4809,
+      0.5626
      ],
      "texture": "BoneWing_Skin.png",
-     "tris": 678
+     "tris": 204
     }
    ],
    "sided": true,
@@ -967,50 +951,50 @@
     {
      "name": "BrokenHorn_Bone",
      "offset": [
-      0.0618,
-      0.3573,
-      0.0229
+      0.061,
+      0.3569,
+      0.0235
      ],
      "role": "Bone",
      "size": [
-      0.2731,
-      0.318,
-      0.2349
+      0.2745,
+      0.3198,
+      0.235
      ],
      "texture": "BrokenHorn_Bone.png",
-     "tris": 678
+     "tris": 164
     },
     {
      "name": "BrokenHorn_BoneDark",
      "offset": [
-      0.0103,
-      0.1725,
-      0.007
+      0.0006,
+      0.1724,
+      0.0029
      ],
      "role": "BoneDark",
      "size": [
-      0.3628,
-      0.6869,
-      0.3029
+      0.3814,
+      0.6889,
+      0.3748
      ],
      "texture": "BrokenHorn_BoneDark.png",
-     "tris": 996
+     "tris": 278
     },
     {
      "name": "BrokenHorn_Skin",
      "offset": [
-      -0.0005,
-      -0.0507,
-      -0.0003
+      -0.0009,
+      -0.0554,
+      -0.0006
      ],
      "role": "Skin",
      "size": [
-      0.3922,
-      0.175,
-      0.3926
+      0.3919,
+      0.193,
+      0.3927
      ],
      "texture": "BrokenHorn_Skin.png",
-     "tris": 826
+     "tris": 182
     }
    ],
    "sided": true,
@@ -1028,34 +1012,34 @@
     {
      "name": "ClawedFoot_Claw",
      "offset": [
-      -0.0007,
-      0.0493,
-      -0.7215
+      -0.0062,
+      0.0524,
+      -0.7195
      ],
      "role": "Claw",
      "size": [
       0.3975,
-      0.1241,
-      0.197
+      0.1313,
+      0.2025
      ],
      "texture": "ClawedFoot_Claw.png",
-     "tris": 605
+     "tris": 149
     },
     {
      "name": "ClawedFoot_Skin",
      "offset": [
-      -0.0007,
-      0.1385,
-      -0.1848
+      -0.0017,
+      0.1387,
+      -0.187
      ],
      "role": "Skin",
      "size": [
-      0.4385,
-      0.285,
-      0.9708
+      0.441,
+      0.2839,
+      0.9759
      ],
      "texture": "ClawedFoot_Skin.png",
-     "tris": 2393
+     "tris": 599
     }
    ],
    "sided": true,
@@ -1072,50 +1056,50 @@
     {
      "name": "ClawedHand_Claw",
      "offset": [
-      -0.1828,
-      -0.6638,
-      -0.04
+      -0.1801,
+      -0.6613,
+      -0.0399
      ],
      "role": "Claw",
      "size": [
-      0.2297,
-      0.4814,
-      0.5533
+      0.233,
+      0.4833,
+      0.5475
      ],
      "texture": "ClawedHand_Claw.png",
-     "tris": 762
+     "tris": 191
     },
     {
      "name": "ClawedHand_Skin",
      "offset": [
-      -0.0497,
-      -0.3726,
+      -0.0493,
+      -0.3757,
       -0.0582
      ],
      "role": "Skin",
      "size": [
-      0.4017,
-      0.7904,
-      0.6161
+      0.4058,
+      0.7975,
+      0.6141
      ],
      "texture": "ClawedHand_Skin.png",
-     "tris": 2578
+     "tris": 652
     },
     {
      "name": "ClawedHand_SkinLight",
      "offset": [
-      0.0552,
-      -0.3845,
-      0.0015
+      0.0497,
+      -0.3872,
+      0.001
      ],
      "role": "SkinLight",
      "size": [
-      0.1171,
-      0.1458,
-      0.4967
+      0.0965,
+      0.1687,
+      0.4957
      ],
      "texture": "ClawedHand_SkinLight.png",
-     "tris": 158
+     "tris": 31
     }
    ],
    "sided": true,
@@ -1132,18 +1116,18 @@
     {
      "name": "CompoundEye_Void",
      "offset": [
-      -0.0006,
-      0.0199,
-      -0.0001
+      0.0011,
+      0.0205,
+      -0.0006
      ],
      "role": "Void",
      "size": [
-      0.48,
-      0.4008,
-      0.5605
+      0.4822,
+      0.4015,
+      0.5608
      ],
      "texture": "CompoundEye_Void.png",
-     "tris": 1498
+     "tris": 372
     }
    ],
    "sided": false,
@@ -1165,50 +1149,50 @@
     {
      "name": "CrackedFlesh_Glow",
      "offset": [
-      -0.0648,
-      0.023,
-      0.0379
+      -0.0831,
+      0.0231,
+      0.0135
      ],
      "role": "Glow",
      "size": [
-      0.6635,
-      0.0489,
-      0.4764
+      0.6317,
+      0.0514,
+      0.4634
      ],
      "texture": null,
-     "tris": 523
+     "tris": 122
     },
     {
      "name": "CrackedFlesh_Skin",
      "offset": [
-      0.0001,
-      -0.0403,
-      0.0001
+      0.0004,
+      -0.0411,
+      -0.0002
      ],
      "role": "Skin",
      "size": [
-      0.8383,
-      0.1795,
-      0.8387
+      0.8413,
+      0.1799,
+      0.8391
      ],
      "texture": "CrackedFlesh_Skin.png",
-     "tris": 1968
+     "tris": 497
     },
     {
      "name": "CrackedFlesh_VoidRim",
      "offset": [
-      -0.0195,
-      0.0304,
-      -0.0056
+      -0.0562,
+      0.0298,
+      -0.0072
      ],
      "role": "VoidRim",
      "size": [
-      0.5729,
+      0.5053,
       0.038,
-      0.48
+      0.4218
      ],
      "texture": null,
-     "tris": 507
+     "tris": 131
     }
    ],
    "sided": false,
@@ -1226,50 +1210,50 @@
     {
      "name": "CurvedHorn_Bone",
      "offset": [
-      0.4345,
-      0.4196,
-      0.1943
+      0.4367,
+      0.4207,
+      0.1941
      ],
      "role": "Bone",
      "size": [
-      0.8819,
-      0.5252,
-      0.5385
+      0.8744,
+      0.5233,
+      0.5394
      ],
      "texture": "CurvedHorn_Bone.png",
-     "tris": 1506
+     "tris": 328
     },
     {
      "name": "CurvedHorn_BoneDark",
      "offset": [
-      0.0081,
-      0.0621,
-      -0.0075
+      0.0141,
+      0.0792,
+      -0.0112
      ],
      "role": "BoneDark",
      "size": [
-      0.3575,
-      0.4473,
-      0.3106
+      0.3726,
+      0.4792,
+      0.3282
      ],
      "texture": "CurvedHorn_BoneDark.png",
-     "tris": 529
+     "tris": 172
     },
     {
      "name": "CurvedHorn_Skin",
      "offset": [
-      0.0001,
-      -0.0537,
-      0.0001
+      -0.0013,
+      -0.0442,
+      -0.0018
      ],
      "role": "Skin",
      "size": [
-      0.3638,
-      0.1755,
-      0.3642
+      0.3653,
+      0.2038,
+      0.3648
      ],
      "texture": "CurvedHorn_Skin.png",
-     "tris": 465
+     "tris": 124
     }
    ],
    "sided": true,
@@ -1288,34 +1272,34 @@
     {
      "name": "DigitigradeLeg_Skin",
      "offset": [
-      0.0101,
-      0.2369,
-      -0.0119
+      0.0092,
+      0.2484,
+      -0.0122
      ],
      "role": "Skin",
      "size": [
-      0.7819,
-      1.8686,
-      1.1379
+      0.7823,
+      1.8484,
+      1.1415
      ],
      "texture": "DigitigradeLeg_Skin.png",
-     "tris": 4213
+     "tris": 1057
     },
     {
      "name": "DigitigradeLeg_SkinDark",
      "offset": [
-      0.0044,
-      -0.7186,
-      0.1783
+      -0.0011,
+      -0.7543,
+      0.176
      ],
      "role": "SkinDark",
      "size": [
-      0.2899,
-      0.5817,
-      0.7575
+      0.308,
+      0.5091,
+      0.7507
      ],
      "texture": "DigitigradeLeg_SkinDark.png",
-     "tris": 787
+     "tris": 193
     }
    ],
    "pivot": [
@@ -1412,34 +1396,34 @@
     {
      "name": "EmaciatedTorso_Skin",
      "offset": [
-      0.0026,
-      0.0339,
-      -0.0016
+      0.0027,
+      0.0354,
+      -0.0063
      ],
      "role": "Skin",
      "size": [
-      1.7226,
-      2.4112,
-      0.8437
+      1.7132,
+      2.4127,
+      0.8618
      ],
      "texture": "EmaciatedTorso_Skin.png",
-     "tris": 3748
+     "tris": 1033
     },
     {
      "name": "EmaciatedTorso_SkinLight",
      "offset": [
-      -0.0051,
-      0.0501,
-      -0.0059
+      0.0036,
+      0.0558,
+      -0.0191
      ],
      "role": "SkinLight",
      "size": [
-      1.4007,
-      1.9213,
-      0.8523
+      1.4211,
+      1.9079,
+      0.8361
      ],
      "texture": "EmaciatedTorso_SkinLight.png",
-     "tris": 4252
+     "tris": 967
     }
    ],
    "sided": false,
@@ -1713,66 +1697,66 @@
     {
      "name": "EmaciatedTorsoOpen_Bone",
      "offset": [
-      -0.0052,
-      0.1902,
-      -0.347
+      0.011,
+      0.1946,
+      -0.3489
      ],
      "role": "Bone",
      "size": [
-      0.6304,
-      0.3095,
-      0.1179
+      0.6268,
+      0.2915,
+      0.1189
      ],
      "texture": "EmaciatedTorsoOpen_Bone.png",
-     "tris": 394
+     "tris": 81
     },
     {
      "name": "EmaciatedTorsoOpen_Skin",
      "offset": [
-      0.0023,
-      0.0339,
-      0.0174
+      0.0027,
+      0.0366,
+      0.0111
      ],
      "role": "Skin",
      "size": [
-      1.7205,
-      2.4112,
-      0.8056
+      1.7132,
+      2.415,
+      0.827
      ],
      "texture": "EmaciatedTorsoOpen_Skin.png",
-     "tris": 3389
+     "tris": 939
     },
     {
      "name": "EmaciatedTorsoOpen_SkinLight",
      "offset": [
-      -0.0051,
-      0.0453,
-      -0.0045
+      0.0036,
+      0.0558,
+      -0.0136
      ],
      "role": "SkinLight",
      "size": [
-      1.4007,
-      1.9309,
-      0.8495
+      1.4211,
+      1.9079,
+      0.8218
      ],
      "texture": "EmaciatedTorsoOpen_SkinLight.png",
-     "tris": 3769
+     "tris": 871
     },
     {
      "name": "EmaciatedTorsoOpen_Void",
      "offset": [
-      -0.0017,
-      0.2354,
-      -0.1664
+      -0.0047,
+      0.2054,
+      -0.1725
      ],
      "role": "Void",
      "size": [
-      0.5851,
-      0.7906,
-      0.438
+      0.5753,
+      0.8041,
+      0.4525
      ],
      "texture": "EmaciatedTorsoOpen_Void.png",
-     "tris": 448
+     "tris": 109
     }
    ],
    "sided": false,
@@ -2019,34 +2003,34 @@
     {
      "name": "ExtraEar_SkinDark",
      "offset": [
-      0.0001,
-      0.1201,
-      0.0585
+      -0.0001,
+      0.1204,
+      0.0583
      ],
      "role": "SkinDark",
      "size": [
-      0.2796,
-      0.4388,
-      0.109
+      0.2806,
+      0.4392,
+      0.1089
      ],
      "texture": "ExtraEar_SkinDark.png",
-     "tris": 1242
+     "tris": 314
     },
     {
      "name": "ExtraEar_SkinDeep",
      "offset": [
-      0.0009,
-      0.1395,
-      0.0324
+      0.0023,
+      0.1308,
+      0.0318
      ],
      "role": "SkinDeep",
      "size": [
-      0.1688,
-      0.3001,
-      0.0551
+      0.1659,
+      0.3104,
+      0.0558
      ],
      "texture": "ExtraEar_SkinDeep.png",
-     "tris": 258
+     "tris": 60
     }
    ],
    "sided": false,
@@ -2068,66 +2052,66 @@
     {
      "name": "Eye_Eye",
      "offset": [
-      0.0003,
-      0.0152,
-      -0.0172
+      -0.0129,
+      0.0961,
+      -0.0246
      ],
      "role": "Eye",
      "size": [
-      0.2268,
-      0.2456,
-      0.1924
+      0.2481,
+      0.0735,
+      0.1751
      ],
      "texture": null,
-     "tris": 159
+     "tris": 41
     },
     {
      "name": "Eye_Pupil",
      "offset": [
-      -0.0012,
-      0.1281,
-      0.0016
+      0.0021,
+      0.1272,
+      0.0035
      ],
      "role": "Pupil",
      "size": [
-      0.0358,
-      0.0199,
-      0.1248
+      0.0448,
+      0.0167,
+      0.119
      ],
      "texture": null,
-     "tris": 26
+     "tris": 8
     },
     {
      "name": "Eye_Skin",
      "offset": [
-      -0.0003,
-      -0.0285,
-      0.0
+      -0.0002,
+      -0.0253,
+      -0.0001
      ],
      "role": "Skin",
      "size": [
-      0.4573,
-      0.158,
+      0.4575,
+      0.1703,
       0.4211
      ],
      "texture": "Eye_Skin.png",
-     "tris": 873
+     "tris": 212
     },
     {
      "name": "Eye_SkinDark",
      "offset": [
-      -0.002,
-      0.067,
-      -0.0012
+      0.0008,
+      0.0694,
+      -0.0005
      ],
      "role": "SkinDark",
      "size": [
-      0.3566,
-      0.1078,
-      0.3549
+      0.3596,
+      0.115,
+      0.3606
      ],
      "texture": "Eye_SkinDark.png",
-     "tris": 340
+     "tris": 87
     }
    ],
    "sided": false,
@@ -2149,66 +2133,66 @@
     {
      "name": "EyeCluster_Eye",
      "offset": [
-      -0.0627,
-      0.0702,
-      -0.0205
+      -0.0549,
+      0.0744,
+      -0.0139
      ],
      "role": "Eye",
      "size": [
-      0.4866,
-      0.0515,
-      0.4888
+      0.478,
+      0.049,
+      0.463
      ],
      "texture": null,
-     "tris": 278
+     "tris": 87
     },
     {
      "name": "EyeCluster_Pupil",
      "offset": [
-      -0.0444,
-      0.0904,
-      -0.0528
+      -0.0116,
+      0.0795,
+      -0.0444
      ],
      "role": "Pupil",
      "size": [
-      0.1847,
-      0.0128,
-      0.3197
+      0.2333,
+      0.0388,
+      0.2878
      ],
      "texture": null,
-     "tris": 12
+     "tris": 6
     },
     {
      "name": "EyeCluster_Skin",
      "offset": [
-      -0.0001,
-      -0.0524,
-      0.0005
+      -0.0005,
+      -0.0488,
+      0.0002
      ],
      "role": "Skin",
      "size": [
-      0.8392,
-      0.2558,
-      0.7604
+      0.8383,
+      0.264,
+      0.7597
      ],
      "texture": "EyeCluster_Skin.png",
-     "tris": 2580
+     "tris": 615
     },
     {
      "name": "EyeCluster_SkinDark",
      "offset": [
-      -0.0539,
-      0.0417,
-      -0.0109
+      -0.0549,
+      0.0499,
+      -0.0137
      ],
      "role": "SkinDark",
      "size": [
-      0.5393,
-      0.0452,
-      0.529
+      0.544,
+      0.0667,
+      0.5423
      ],
      "texture": "EyeCluster_SkinDark.png",
-     "tris": 128
+     "tris": 40
     }
    ],
    "sided": false,
@@ -2233,50 +2217,50 @@
     {
      "name": "FacelessHead_Skin",
      "offset": [
-      0.0001,
-      0.0989,
-      -0.0222
+      -0.0003,
+      0.0986,
+      -0.0219
      ],
      "role": "Skin",
      "size": [
-      1.1984,
-      1.6268,
-      1.3635
+      1.1982,
+      1.6266,
+      1.3632
      ],
      "texture": "FacelessHead_Skin.png",
-     "tris": 3946
+     "tris": 986
     },
     {
      "name": "FacelessHead_SkinDark",
      "offset": [
-      0.0023,
-      0.0782,
-      -0.5755
+      -0.0018,
+      0.0399,
+      -0.5328
      ],
      "role": "SkinDark",
      "size": [
-      0.067,
-      1.1433,
-      0.2476
+      0.0622,
+      1.1312,
+      0.3086
      ],
      "texture": "FacelessHead_SkinDark.png",
-     "tris": 385
+     "tris": 92
     },
     {
      "name": "FacelessHead_SkinLight",
      "offset": [
-      -0.0069,
-      -0.0459,
-      -0.5205
+      0.0049,
+      -0.0505,
+      -0.477
      ],
      "role": "SkinLight",
      "size": [
-      1.0268,
-      0.9161,
-      0.3608
+      1.0551,
+      0.9291,
+      0.4528
      ],
      "texture": "FacelessHead_SkinLight.png",
-     "tris": 667
+     "tris": 172
     }
    ],
    "sided": false,
@@ -2486,34 +2470,34 @@
     {
      "name": "Fist_Claw",
      "offset": [
-      -0.2456,
-      -0.4252,
-      0.0892
+      -0.2337,
+      -0.4318,
+      0.0874
      ],
      "role": "Claw",
      "size": [
-      0.0562,
-      0.1246,
-      0.1106
+      0.082,
+      0.1078,
+      0.1139
      ],
      "texture": "Fist_Claw.png",
-     "tris": 54
+     "tris": 10
     },
     {
      "name": "Fist_Skin",
      "offset": [
-      0.0078,
-      -0.2806,
-      -0.1242
+      0.0093,
+      -0.2802,
+      -0.1248
      ],
      "role": "Skin",
      "size": [
-      0.6153,
-      0.7185,
-      0.7484
+      0.6147,
+      0.7186,
+      0.7491
      ],
      "texture": "Fist_Skin.png",
-     "tris": 3944
+     "tris": 988
     }
    ],
    "sided": true,
@@ -2530,18 +2514,18 @@
     {
      "name": "Foot_Skin",
      "offset": [
-      -0.0006,
-      0.1273,
-      -0.1458
+      -0.0,
+      0.1281,
+      -0.145
      ],
      "role": "Skin",
      "size": [
-      0.3998,
-      0.2683,
-      0.8312
+      0.4005,
+      0.2692,
+      0.8321
      ],
      "texture": "Foot_Skin.png",
-     "tris": 2498
+     "tris": 624
     }
    ],
    "sided": true,
@@ -2557,82 +2541,82 @@
     {
      "name": "GiantEye_Eye",
      "offset": [
-      -0.002,
-      0.0069,
-      -0.0313
+      -0.001,
+      0.0204,
+      -0.0435
      ],
      "role": "Eye",
      "size": [
-      0.7135,
-      0.6995,
-      0.6597
+      0.6942,
+      0.7279,
+      0.6214
      ],
      "texture": null,
-     "tris": 372
+     "tris": 77
     },
     {
      "name": "GiantEye_Glow",
      "offset": [
-      0.0092,
-      0.3664,
-      -0.0005
+      0.0063,
+      0.3578,
+      -0.0199
      ],
      "role": "Glow",
      "size": [
-      0.5074,
-      0.1096,
-      0.4245
+      0.5451,
+      0.1178,
+      0.4567
      ],
      "texture": null,
-     "tris": 171
+     "tris": 38
     },
     {
      "name": "GiantEye_Pupil",
      "offset": [
-      -0.0048,
-      0.4112,
-      -0.0015
+      -0.0391,
+      0.3932,
+      0.0159
      ],
      "role": "Pupil",
      "size": [
-      0.1159,
-      0.0521,
-      0.3805
+      0.2058,
+      0.0894,
+      0.3928
      ],
      "texture": null,
-     "tris": 49
+     "tris": 14
     },
     {
      "name": "GiantEye_Skin",
      "offset": [
-      -0.0004,
-      -0.0521,
-      -0.0001
+      -0.003,
+      -0.0551,
+      -0.0003
      ],
      "role": "Skin",
      "size": [
-      1.4448,
-      0.4654,
-      1.3299
+      1.4469,
+      0.5053,
+      1.33
      ],
      "texture": "GiantEye_Skin.png",
-     "tris": 1409
+     "tris": 366
     },
     {
      "name": "GiantEye_SkinDark",
      "offset": [
-      0.0007,
-      0.2223,
-      -0.0003
+      -0.0018,
+      0.2159,
+      -0.0018
      ],
      "role": "SkinDark",
      "size": [
-      1.0615,
-      0.2231,
-      1.0658
+      1.0744,
+      0.2217,
+      1.0844
      ],
      "texture": "GiantEye_SkinDark.png",
-     "tris": 499
+     "tris": 129
     }
    ],
    "sided": false,
@@ -2685,50 +2669,50 @@
     {
      "name": "GrinMouth_Skin",
      "offset": [
-      0.0002,
-      -0.0389,
-      0.03
+      0.0004,
+      -0.0357,
+      0.0303
      ],
      "role": "Skin",
      "size": [
-      1.1325,
-      0.2624,
-      0.6003
+      1.1331,
+      0.2682,
+      0.6018
      ],
      "texture": "GrinMouth_Skin.png",
-     "tris": 2721
+     "tris": 607
     },
     {
      "name": "GrinMouth_SkinDark",
      "offset": [
-      -0.0003,
-      0.0362,
-      0.0934
+      -0.0049,
+      0.0341,
+      0.0887
      ],
      "role": "SkinDark",
      "size": [
-      0.9596,
-      0.1238,
-      0.3933
+      0.9615,
+      0.131,
+      0.4003
      ],
      "texture": "GrinMouth_SkinDark.png",
-     "tris": 1207
+     "tris": 384
     },
     {
      "name": "GrinMouth_Teeth",
      "offset": [
-      0.0039,
-      0.0594,
-      0.1343
+      0.3952,
+      0.0402,
+      0.1522
      ],
      "role": "Teeth",
      "size": [
-      0.8105,
-      0.0342,
-      0.1036
+      0.0598,
+      0.0648,
+      0.0571
      ],
      "texture": "GrinMouth_Teeth.png",
-     "tris": 70
+     "tris": 7
     }
    ],
    "sided": false,
@@ -2750,50 +2734,50 @@
     {
      "name": "HoofFoot_Claw",
      "offset": [
-      0.0001,
-      0.1942,
-      -0.0456
+      -0.0002,
+      0.1973,
+      -0.0455
      ],
      "role": "Claw",
      "size": [
-      0.4404,
-      0.4011,
-      0.445
+      0.4414,
+      0.4065,
+      0.4455
      ],
      "texture": "HoofFoot_Claw.png",
-     "tris": 1780
+     "tris": 433
     },
     {
      "name": "HoofFoot_Skin",
      "offset": [
-      -0.0018,
-      0.3471,
-      0.0335
+      -0.0025,
+      0.3485,
+      0.0287
      ],
      "role": "Skin",
      "size": [
-      0.3214,
-      0.1706,
-      0.2867
+      0.3227,
+      0.1652,
+      0.2971
      ],
      "texture": "HoofFoot_Skin.png",
-     "tris": 440
+     "tris": 131
     },
     {
      "name": "HoofFoot_Void",
      "offset": [
-      -0.0057,
-      0.1005,
-      -0.1142
+      0.0568,
+      0.1028,
+      -0.1086
      ],
      "role": "Void",
      "size": [
-      0.2754,
-      0.2137,
-      0.3011
+      0.2452,
+      0.2174,
+      0.3194
      ],
      "texture": "HoofFoot_Void.png",
-     "tris": 278
+     "tris": 60
     }
    ],
    "sided": true,
@@ -2823,66 +2807,66 @@
     {
      "name": "HumanCurseHead_Skin",
      "offset": [
-      -0.0018,
-      0.0658,
-      -0.0246
+      0.0022,
+      0.0664,
+      -0.0237
      ],
      "role": "Skin",
      "size": [
-      1.2547,
-      1.5539,
-      1.4748
+      1.2591,
+      1.5528,
+      1.4766
      ],
      "texture": "HumanCurseHead_Skin.png",
-     "tris": 5798
+     "tris": 1457
     },
     {
      "name": "HumanCurseHead_SkinDark",
      "offset": [
-      0.0004,
-      0.0345,
-      0.0558
+      0.0015,
+      0.0358,
+      0.0465
      ],
      "role": "SkinDark",
      "size": [
-      1.3179,
-      0.3856,
-      0.2794
+      1.321,
+      0.3949,
+      0.2821
      ],
      "texture": "HumanCurseHead_SkinDark.png",
-     "tris": 397
+     "tris": 108
     },
     {
      "name": "HumanCurseHead_SkinDeep",
      "offset": [
-      -0.0005,
-      -0.0345,
-      -0.5657
+      -0.0043,
+      -0.054,
+      -0.5707
      ],
      "role": "SkinDeep",
      "size": [
-      0.7108,
-      0.5347,
-      0.1683
+      0.6965,
+      0.5346,
+      0.1835
      ],
      "texture": "HumanCurseHead_SkinDeep.png",
-     "tris": 334
+     "tris": 70
     },
     {
      "name": "HumanCurseHead_SkinLight",
      "offset": [
-      0.0146,
-      0.2899,
-      -0.1606
+      0.0181,
+      0.295,
+      -0.1692
      ],
      "role": "SkinLight",
      "size": [
-      0.9883,
-      0.9919,
-      0.9034
+      0.9967,
+      1.0106,
+      0.8889
      ],
      "texture": "HumanCurseHead_SkinLight.png",
-     "tris": 469
+     "tris": 113
     }
    ],
    "sided": false,
@@ -3092,34 +3076,34 @@
     {
      "name": "HuskArm_Flesh",
      "offset": [
-      -0.4732,
-      -0.7316,
-      -0.0775
+      -0.478,
+      -0.753,
+      -0.0865
      ],
      "role": "Flesh",
      "size": [
-      0.2769,
-      0.9819,
-      0.5946
+      0.258,
+      0.9487,
+      0.61
      ],
      "texture": "HuskArm_Flesh.png",
-     "tris": 912
+     "tris": 255
     },
     {
      "name": "HuskArm_Skin",
      "offset": [
-      -0.4061,
-      -0.2307,
-      0.0688
+      -0.4057,
+      -0.2318,
+      0.0694
      ],
      "role": "Skin",
      "size": [
-      1.0444,
-      2.191,
-      0.9883
+      1.0445,
+      2.1912,
+      0.9907
      ],
      "texture": "HuskArm_Skin.png",
-     "tris": 6088
+     "tris": 1493
     }
    ],
    "pivot": [
@@ -3219,50 +3203,50 @@
     {
      "name": "HuskHead_Claw",
      "offset": [
-      -0.028,
-      0.5001,
-      0.1531
+      -0.0333,
+      0.4796,
+      0.0149
      ],
      "role": "Claw",
      "size": [
-      0.915,
-      1.2073,
-      1.0867
+      0.9245,
+      1.1705,
+      0.796
      ],
      "texture": "HuskHead_Claw.png",
-     "tris": 395
+     "tris": 93
     },
     {
      "name": "HuskHead_Eye",
      "offset": [
-      -0.3799,
-      -0.0051,
-      -0.2808
+      -0.3862,
+      -0.0062,
+      -0.2797
      ],
      "role": "Eye",
      "size": [
-      0.1353,
-      0.1347,
-      0.1387
+      0.137,
+      0.1334,
+      0.143
      ],
      "texture": null,
-     "tris": 140
+     "tris": 36
     },
     {
      "name": "HuskHead_Skin",
      "offset": [
-      -0.0022,
-      -0.0274,
-      0.1908
+      -0.0005,
+      -0.0252,
+      0.1911
      ],
      "role": "Skin",
      "size": [
-      1.2504,
-      2.2965,
-      1.6638
+      1.2508,
+      2.2971,
+      1.6699
      ],
      "texture": "HuskHead_Skin.png",
-     "tris": 9463
+     "tris": 2371
     }
    ],
    "sided": false,
@@ -3473,34 +3457,34 @@
     {
      "name": "HuskLeg_Flesh",
      "offset": [
-      -0.2093,
-      -0.1072,
-      -0.2265
+      -0.2278,
+      -0.106,
+      -0.2262
      ],
      "role": "Flesh",
      "size": [
-      0.4433,
-      1.8464,
-      0.6683
+      0.4518,
+      1.861,
+      0.6715
      ],
      "texture": "HuskLeg_Flesh.png",
-     "tris": 842
+     "tris": 221
     },
     {
      "name": "HuskLeg_Skin",
      "offset": [
-      -0.0273,
-      0.0161,
-      -0.0756
+      -0.0266,
+      0.0158,
+      -0.075
      ],
      "role": "Skin",
      "size": [
-      0.8777,
-      2.4277,
-      0.97
+      0.8783,
+      2.4268,
+      0.9738
      ],
      "texture": "HuskLeg_Skin.png",
-     "tris": 5158
+     "tris": 1279
     }
    ],
    "pivot": [
@@ -3573,34 +3557,34 @@
     {
      "name": "HuskTail_Claw",
      "offset": [
-      -1.1686,
-      -1.7754,
-      0.3995
+      -1.1539,
+      -1.7788,
+      0.4034
      ],
      "role": "Claw",
      "size": [
-      0.2373,
-      0.3295,
-      0.1899
+      0.245,
+      0.3347,
+      0.1963
      ],
      "texture": "HuskTail_Claw.png",
-     "tris": 194
+     "tris": 50
     },
     {
      "name": "HuskTail_Skin",
      "offset": [
-      -0.4549,
-      -0.8642,
-      0.3335
+      -0.4473,
+      -0.8637,
+      0.3336
      ],
      "role": "Skin",
      "size": [
-      1.4309,
-      2.245,
-      1.3852
+      1.4138,
+      2.2519,
+      1.3897
      ],
      "texture": "HuskTail_Skin.png",
-     "tris": 3304
+     "tris": 824
     }
    ],
    "sided": false,
@@ -3641,50 +3625,50 @@
     {
      "name": "HuskTorso_Flesh",
      "offset": [
-      0.0274,
-      -0.1724,
-      -0.5478
+      0.0127,
+      -0.1897,
+      -0.5363
      ],
      "role": "Flesh",
      "size": [
-      1.7733,
-      2.0746,
-      0.6769
+      1.7449,
+      2.0729,
+      0.6989
      ],
      "texture": "HuskTorso_Flesh.png",
-     "tris": 2142
+     "tris": 517
     },
     {
      "name": "HuskTorso_Skin",
      "offset": [
-      0.0008,
-      0.0802,
-      0.0415
+      0.001,
+      0.0789,
+      0.0399
      ],
      "role": "Skin",
      "size": [
-      2.4676,
-      2.7637,
-      1.8869
+      2.4704,
+      2.768,
+      1.8852
      ],
      "texture": "HuskTorso_Skin.png",
-     "tris": 7055
+     "tris": 1786
     },
     {
      "name": "HuskTorso_Void",
      "offset": [
-      -0.0864,
-      0.0005,
-      -0.5477
+      -0.0629,
+      -0.0061,
+      -0.5471
      ],
      "role": "Void",
      "size": [
-      0.9235,
-      1.3748,
-      0.6148
+      0.9706,
+      1.4088,
+      0.6168
      ],
      "texture": "HuskTorso_Void.png",
-     "tris": 801
+     "tris": 197
     }
    ],
    "sided": false,
@@ -3940,66 +3924,66 @@
     {
      "name": "MandibleHead_Glow",
      "offset": [
-      0.001,
-      0.2099,
-      -0.1585
+      0.0001,
+      0.1597,
+      -0.1314
      ],
      "role": "Glow",
      "size": [
-      1.1907,
-      0.2753,
-      0.1419
+      1.1962,
+      0.1742,
+      0.089
      ],
      "texture": null,
-     "tris": 283
+     "tris": 39
     },
     {
      "name": "MandibleHead_Skin",
      "offset": [
-      -0.0011,
-      0.4229,
-      -0.2713
+      -0.0006,
+      0.421,
+      -0.2274
      ],
      "role": "Skin",
      "size": [
-      0.9607,
-      0.5099,
-      0.9962
+      0.9614,
+      0.5287,
+      1.1029
      ],
      "texture": "MandibleHead_Skin.png",
-     "tris": 1088
+     "tris": 259
     },
     {
      "name": "MandibleHead_SkinDark",
      "offset": [
-      0.0006,
-      0.1033,
-      0.051
+      0.001,
+      0.103,
+      0.0508
      ],
      "role": "SkinDark",
      "size": [
-      0.9976,
-      1.5004,
-      1.9261
+      0.9999,
+      1.5023,
+      1.9315
      ],
      "texture": "MandibleHead_SkinDark.png",
-     "tris": 4439
+     "tris": 1138
     },
     {
      "name": "MandibleHead_Void",
      "offset": [
-      0.0011,
-      0.2182,
-      -0.2608
+      -0.0002,
+      0.2216,
+      -0.2605
      ],
      "role": "Void",
      "size": [
-      1.1893,
-      0.5063,
-      0.5226
+      1.1958,
+      0.4918,
+      0.5282
      ],
      "texture": "MandibleHead_Void.png",
-     "tris": 1188
+     "tris": 314
     }
    ],
    "sided": false,
@@ -4209,50 +4193,50 @@
     {
      "name": "Mandibles_Claw",
      "offset": [
-      -0.0002,
-      0.2911,
-      -0.1399
+      0.0002,
+      0.2881,
+      -0.1305
      ],
      "role": "Claw",
      "size": [
-      0.8098,
-      0.7076,
-      0.4505
+      0.8111,
+      0.7113,
+      0.4665
      ],
      "texture": "Mandibles_Claw.png",
-     "tris": 2076
+     "tris": 512
     },
     {
      "name": "Mandibles_SkinDark",
      "offset": [
-      0.0017,
-      0.0011,
-      -0.0007
+      0.0077,
+      0.0044,
+      0.0002
      ],
      "role": "SkinDark",
      "size": [
-      0.3594,
-      0.1628,
-      0.2382
+      0.3536,
+      0.167,
+      0.2405
      ],
      "texture": "Mandibles_SkinDark.png",
-     "tris": 368
+     "tris": 102
     },
     {
      "name": "Mandibles_Teeth",
      "offset": [
-      0.0003,
-      0.3586,
-      -0.1646
+      -0.2538,
+      0.3621,
+      -0.175
      ],
      "role": "Teeth",
      "size": [
-      0.5503,
-      0.1036,
-      0.0748
+      0.0404,
+      0.1048,
+      0.09
      ],
      "texture": "Mandibles_Teeth.png",
-     "tris": 54
+     "tris": 10
     }
    ],
    "sided": false,
@@ -4274,66 +4258,66 @@
     {
      "name": "MassiveHorn_Bone",
      "offset": [
-      0.9899,
-      0.688,
-      0.1188
+      1.0541,
+      0.6865,
+      0.1207
      ],
      "role": "Bone",
      "size": [
-      1.8089,
-      0.8345,
-      0.6379
+      1.8447,
+      0.8467,
+      0.6321
      ],
      "texture": "MassiveHorn_Bone.png",
-     "tris": 1083
+     "tris": 282
     },
     {
      "name": "MassiveHorn_BoneDark",
      "offset": [
-      0.2366,
-      0.3181,
-      0.0023
+      0.1015,
+      0.2256,
+      0.0066
      ],
      "role": "BoneDark",
      "size": [
-      1.1226,
-      1.2941,
-      0.6132
+      0.8066,
+      1.1145,
+      0.6081
      ],
      "texture": "MassiveHorn_BoneDark.png",
-     "tris": 703
+     "tris": 176
     },
     {
      "name": "MassiveHorn_Claw",
      "offset": [
-      1.8092,
-      0.9526,
-      0.3782
+      1.822,
+      0.9316,
+      0.3894
      ],
      "role": "Claw",
      "size": [
-      0.3585,
-      0.1562,
-      0.1508
+      0.3205,
+      0.1077,
+      0.1225
      ],
      "texture": "MassiveHorn_Claw.png",
-     "tris": 81
+     "tris": 14
     },
     {
      "name": "MassiveHorn_Skin",
      "offset": [
-      -0.0001,
-      -0.0777,
-      -0.0005
+      0.0014,
+      -0.0653,
+      0.0047
      ],
      "role": "Skin",
      "size": [
-      0.8394,
-      0.3839,
-      0.8392
+      0.8372,
+      0.4667,
+      0.8378
      ],
      "texture": "MassiveHorn_Skin.png",
-     "tris": 631
+     "tris": 152
     }
    ],
    "sided": true,
@@ -4351,18 +4335,18 @@
     {
      "name": "MassiveLeg_Skin",
      "offset": [
-      0.0084,
-      0.0898,
-      0.0139
+      0.0069,
+      0.0901,
+      0.0136
      ],
      "role": "Skin",
      "size": [
-      1.0233,
-      2.2819,
-      1.0602
+      1.0237,
+      2.283,
+      1.0612
      ],
      "texture": "MassiveLeg_Skin.png",
-     "tris": 5000
+     "tris": 1248
     }
    ],
    "pivot": [
@@ -4458,34 +4442,34 @@
     {
      "name": "MassiveTorso_Skin",
      "offset": [
-      0.0028,
-      -0.0276,
-      -0.0068
+      0.0019,
+      -0.0275,
+      0.0182
      ],
      "role": "Skin",
      "size": [
-      3.2593,
-      2.4508,
-      1.6525
+      3.2578,
+      2.4488,
+      1.7008
      ],
      "texture": "MassiveTorso_Skin.png",
-     "tris": 7247
+     "tris": 1827
     },
     {
      "name": "MassiveTorso_SkinLight",
      "offset": [
-      -0.0004,
-      0.648,
+      -0.0105,
+      0.6363,
       0.0335
      ],
      "role": "SkinLight",
      "size": [
-      1.8654,
-      1.3247,
-      1.7286
+      1.8886,
+      1.3521,
+      1.7291
      ],
      "texture": "MassiveTorso_SkinLight.png",
-     "tris": 1753
+     "tris": 421
     }
    ],
    "sided": false,
@@ -4758,66 +4742,66 @@
     {
      "name": "MassiveTorsoOpen_Bone",
      "offset": [
-      0.0053,
-      0.1116,
-      -0.7138
+      0.0079,
+      0.1229,
+      -0.7152
      ],
      "role": "Bone",
      "size": [
-      0.9289,
-      0.3793,
-      0.122
+      0.9344,
+      0.4081,
+      0.1543
      ],
      "texture": "MassiveTorsoOpen_Bone.png",
-     "tris": 365
+     "tris": 101
     },
     {
      "name": "MassiveTorsoOpen_Skin",
      "offset": [
-      0.0028,
-      -0.0276,
-      0.0113
+      0.0019,
+      -0.0275,
+      0.0339
      ],
      "role": "Skin",
      "size": [
-      3.2593,
-      2.4508,
-      1.6161
+      3.2578,
+      2.4488,
+      1.6695
      ],
      "texture": "MassiveTorsoOpen_Skin.png",
-     "tris": 6212
+     "tris": 1542
     },
     {
      "name": "MassiveTorsoOpen_SkinLight",
      "offset": [
-      -0.0004,
-      0.6615,
-      0.0342
+      -0.0119,
+      0.6243,
+      0.0345
      ],
      "role": "SkinLight",
      "size": [
-      1.8654,
-      1.2988,
-      1.7273
+      1.8915,
+      1.3761,
+      1.7349
      ],
      "texture": "MassiveTorsoOpen_SkinLight.png",
-     "tris": 1490
+     "tris": 377
     },
     {
      "name": "MassiveTorsoOpen_Void",
      "offset": [
-      -0.0023,
-      0.0855,
-      -0.5198
+      -0.0166,
+      0.0904,
+      -0.5205
      ],
      "role": "Void",
      "size": [
-      0.9637,
-      1.1275,
-      0.6167
+      0.9785,
+      1.1542,
+      0.6249
      ],
      "texture": "MassiveTorsoOpen_Void.png",
-     "tris": 933
+     "tris": 230
     }
    ],
    "sided": false,
@@ -5063,50 +5047,50 @@
     {
      "name": "Maw_Skin",
      "offset": [
-      0.0004,
-      -0.0077,
-      0.0028
+      -0.0006,
+      -0.0059,
+      0.0098
      ],
      "role": "Skin",
      "size": [
-      0.9353,
-      0.2649,
-      1.1201
+      0.9373,
+      0.2683,
+      1.1301
      ],
      "texture": "Maw_Skin.png",
-     "tris": 1974
+     "tris": 418
     },
     {
      "name": "Maw_SkinDark",
      "offset": [
-      -0.0017,
-      0.0229,
-      -0.0003
+      0.0009,
+      0.0223,
+      -0.0006
      ],
      "role": "SkinDark",
      "size": [
-      0.9205,
-      0.2949,
-      1.2498
+      0.9277,
+      0.2974,
+      1.2506
      ],
      "texture": "Maw_SkinDark.png",
-     "tris": 2407
+     "tris": 670
     },
     {
      "name": "Maw_Teeth",
      "offset": [
-      -0.0015,
-      0.12,
-      -0.0017
+      -0.0024,
+      0.1207,
+      -0.0103
      ],
      "role": "Teeth",
      "size": [
-      0.4698,
-      0.0375,
-      0.6886
+      0.4753,
+      0.0452,
+      0.6855
      ],
      "texture": "Maw_Teeth.png",
-     "tris": 619
+     "tris": 160
     }
    ],
    "sided": false,
@@ -5128,50 +5112,34 @@
     {
      "name": "MuscularArm_Skin",
      "offset": [
-      -0.4032,
-      -0.1816,
-      -0.0003
+      -0.403,
+      -0.182,
+      -0.0013
      ],
      "role": "Skin",
      "size": [
-      0.9469,
-      2.1589,
-      0.9877
+      0.9457,
+      2.162,
+      0.9904
      ],
      "texture": "MuscularArm_Skin.png",
-     "tris": 4685
-    },
-    {
-     "name": "MuscularArm_SkinDark",
-     "offset": [
-      -0.2327,
-      -0.8207,
-      -0.2796
-     ],
-     "role": "SkinDark",
-     "size": [
-      0.1285,
-      0.1819,
-      0.031
-     ],
-     "texture": "MuscularArm_SkinDark.png",
-     "tris": 29
+     "tris": 1178
     },
     {
      "name": "MuscularArm_SkinLight",
      "offset": [
-      -0.3489,
-      -0.0445,
-      -0.2521
+      -0.3364,
+      -0.011,
+      -0.2954
      ],
      "role": "SkinLight",
      "size": [
-      0.6126,
-      0.4829,
-      0.3007
+      0.5644,
+      0.5195,
+      0.23
      ],
      "texture": "MuscularArm_SkinLight.png",
-     "tris": 286
+     "tris": 72
     }
    ],
    "pivot": [
@@ -5290,34 +5258,34 @@
     {
      "name": "MuscularTorso_Skin",
      "offset": [
-      -0.0003,
-      0.0649,
-      0.003
+      -0.0002,
+      0.0644,
+      -0.0061
      ],
      "role": "Skin",
      "size": [
-      2.6919,
-      2.5964,
-      1.2234
+      2.6927,
+      2.5967,
+      1.2445
      ],
      "texture": "MuscularTorso_Skin.png",
-     "tris": 7006
+     "tris": 1776
     },
     {
      "name": "MuscularTorso_SkinLight",
      "offset": [
-      0.019,
-      0.1021,
-      -0.4707
+      0.0141,
+      0.107,
+      -0.4834
      ],
      "role": "SkinLight",
      "size": [
-      1.7189,
-      1.3135,
-      0.3381
+      1.7381,
+      1.3132,
+      0.3183
      ],
      "texture": "MuscularTorso_SkinLight.png",
-     "tris": 994
+     "tris": 222
     }
    ],
    "sided": false,
@@ -5590,66 +5558,66 @@
     {
      "name": "MuscularTorsoOpen_Bone",
      "offset": [
-      0.0058,
-      0.1494,
-      -0.5551
+      0.0022,
+      0.1646,
+      -0.5568
      ],
      "role": "Bone",
      "size": [
-      0.7731,
-      0.362,
-      0.1026
+      0.7794,
+      0.3527,
+      0.1013
      ],
      "texture": "MuscularTorsoOpen_Bone.png",
-     "tris": 382
+     "tris": 81
     },
     {
      "name": "MuscularTorsoOpen_Skin",
      "offset": [
-      -0.0002,
-      0.0649,
-      0.0492
+      0.0016,
+      0.0644,
+      0.0525
      ],
      "role": "Skin",
      "size": [
-      2.6922,
-      2.5964,
-      1.131
+      2.6964,
+      2.5967,
+      1.1274
      ],
      "texture": "MuscularTorsoOpen_Skin.png",
-     "tris": 6151
+     "tris": 1573
     },
     {
      "name": "MuscularTorsoOpen_SkinLight",
      "offset": [
-      0.0075,
-      0.1021,
-      -0.4704
+      -0.0039,
+      0.1033,
+      -0.4837
      ],
      "role": "SkinLight",
      "size": [
-      1.6913,
-      1.3135,
-      0.3376
+      1.702,
+      1.3118,
+      0.3089
      ],
      "texture": "MuscularTorsoOpen_SkinLight.png",
-     "tris": 812
+     "tris": 178
     },
     {
      "name": "MuscularTorsoOpen_Void",
      "offset": [
-      0.0074,
-      0.1763,
-      -0.365
+      0.0051,
+      0.1613,
+      -0.3698
      ],
      "role": "Void",
      "size": [
-      0.7921,
-      0.9854,
-      0.5349
+      0.8052,
+      1.0428,
+      0.5366
      ],
      "texture": "MuscularTorsoOpen_Void.png",
-     "tris": 655
+     "tris": 168
     }
    ],
    "sided": false,
@@ -5895,18 +5863,18 @@
     {
      "name": "NormalArm_Skin",
      "offset": [
-      -0.4019,
-      -0.2048,
-      -0.002
+      -0.4022,
+      -0.2042,
+      -0.0018
      ],
      "role": "Skin",
      "size": [
-      0.7333,
-      2.0081,
-      0.7692
+      0.7356,
+      2.0098,
+      0.7701
      ],
      "texture": "NormalArm_Skin.png",
-     "tris": 4998
+     "tris": 1248
     }
    ],
    "pivot": [
@@ -6001,18 +5969,18 @@
     {
      "name": "NormalLeg_Skin",
      "offset": [
-      0.0093,
-      0.0898,
-      0.0116
+      0.0091,
+      0.0881,
+      0.0123
      ],
      "role": "Skin",
      "size": [
-      0.7353,
+      0.7375,
       2.1516,
-      0.7632
+      0.7649
      ],
      "texture": "NormalLeg_Skin.png",
-     "tris": 5000
+     "tris": 1250
     }
    ],
    "pivot": [
@@ -6108,34 +6076,34 @@
     {
      "name": "NormalTorso_Skin",
      "offset": [
-      -0.0003,
-      0.0446,
-      0.0309
+      0.0015,
+      0.0461,
+      0.0205
      ],
      "role": "Skin",
      "size": [
-      2.1186,
-      2.5558,
-      1.0271
+      2.117,
+      2.5619,
+      1.0477
      ],
      "texture": "NormalTorso_Skin.png",
-     "tris": 6395
+     "tris": 1652
     },
     {
      "name": "NormalTorso_SkinLight",
      "offset": [
-      -0.0001,
-      0.0763,
-      -0.3765
+      -0.006,
+      0.1395,
+      -0.3774
      ],
      "role": "SkinLight",
      "size": [
-      1.3567,
-      1.2901,
-      0.2552
+      1.3532,
+      1.1585,
+      0.252
      ],
      "texture": "NormalTorso_SkinLight.png",
-     "tris": 603
+     "tris": 96
     }
    ],
    "sided": false,
@@ -6408,66 +6376,66 @@
     {
      "name": "NormalTorsoOpen_Bone",
      "offset": [
-      0.0039,
-      0.1577,
-      -0.433
+      -0.0757,
+      0.1579,
+      -0.4358
      ],
      "role": "Bone",
      "size": [
-      0.7212,
-      0.3712,
-      0.1045
+      0.8677,
+      0.3676,
+      0.103
      ],
      "texture": "NormalTorsoOpen_Bone.png",
-     "tris": 480
+     "tris": 100
     },
     {
      "name": "NormalTorsoOpen_Skin",
      "offset": [
-      -0.0003,
-      0.0446,
-      0.0584
+      0.0015,
+      0.0461,
+      0.0508
      ],
      "role": "Skin",
      "size": [
-      2.1186,
-      2.5558,
-      0.9722
+      2.117,
+      2.5619,
+      0.9871
      ],
      "texture": "NormalTorsoOpen_Skin.png",
-     "tris": 5310
+     "tris": 1390
     },
     {
      "name": "NormalTorsoOpen_SkinLight",
      "offset": [
-      0.0034,
-      0.0797,
-      -0.3762
+      0.0078,
+      0.4409,
+      -0.3791
      ],
      "role": "SkinLight",
      "size": [
-      1.3637,
-      1.3026,
-      0.2546
+      1.3808,
+      0.5557,
+      0.2553
      ],
      "texture": "NormalTorsoOpen_SkinLight.png",
-     "tris": 468
+     "tris": 77
     },
     {
      "name": "NormalTorsoOpen_Void",
      "offset": [
-      0.0036,
-      0.1514,
-      -0.2514
+      -0.0057,
+      0.1212,
+      -0.2515
      ],
      "role": "Void",
      "size": [
-      0.6971,
-      1.0108,
-      0.5032
+      0.7691,
+      1.1145,
+      0.5085
      ],
      "texture": "NormalTorsoOpen_Void.png",
-     "tris": 742
+     "tris": 183
     }
    ],
    "sided": false,
@@ -6713,34 +6681,34 @@
     {
      "name": "OpenHand_Skin",
      "offset": [
-      -0.0462,
-      -0.3658,
-      -0.0581
+      -0.0475,
+      -0.3674,
+      -0.0575
      ],
      "role": "Skin",
      "size": [
-      0.3952,
-      0.7762,
-      0.6153
+      0.3961,
+      0.7809,
+      0.6138
      ],
      "texture": "OpenHand_Skin.png",
-     "tris": 3302
+     "tris": 836
     },
     {
      "name": "OpenHand_SkinLight",
      "offset": [
-      0.0463,
-      -0.3814,
-      0.0009
+      0.0494,
+      -0.3865,
+      0.0031
      ],
      "role": "SkinLight",
      "size": [
-      0.1372,
-      0.1464,
-      0.4973
+      0.0993,
+      0.1647,
+      0.4926
      ],
      "texture": "OpenHand_SkinLight.png",
-     "tris": 198
+     "tris": 38
     }
    ],
    "sided": true,
@@ -6756,50 +6724,50 @@
     {
      "name": "RamHorn_Bone",
      "offset": [
-      0.3312,
-      -0.1903,
-      0.2925
+      0.3409,
+      -0.1874,
+      0.2917
      ],
      "role": "Bone",
      "size": [
-      0.5992,
-      0.9295,
-      0.941
+      0.5792,
+      0.9338,
+      0.9469
      ],
      "texture": "RamHorn_Bone.png",
-     "tris": 1545
+     "tris": 388
     },
     {
      "name": "RamHorn_BoneDark",
      "offset": [
-      0.0828,
-      0.0532,
-      0.2415
+      0.0394,
+      0.0528,
+      0.2445
      ],
      "role": "BoneDark",
      "size": [
-      0.5867,
-      0.5009,
-      0.9402
+      0.5598,
+      0.5084,
+      0.965
      ],
      "texture": "RamHorn_BoneDark.png",
-     "tris": 653
+     "tris": 167
     },
     {
      "name": "RamHorn_Skin",
      "offset": [
-      -0.0001,
-      -0.0473,
-      0.0023
+      0.0003,
+      -0.0471,
+      0.0
      ],
      "role": "Skin",
      "size": [
-      0.477,
-      0.2439,
-      0.4838
+      0.4816,
+      0.2758,
+      0.476
      ],
      "texture": "RamHorn_Skin.png",
-     "tris": 302
+     "tris": 69
     }
    ],
    "sided": true,
@@ -6818,34 +6786,34 @@
     {
      "name": "RibGrowth_Bone",
      "offset": [
-      -0.0891,
-      0.3065,
-      -0.2504
+      -0.0869,
+      0.3053,
+      -0.2459
      ],
      "role": "Bone",
      "size": [
-      0.3254,
-      0.5772,
-      1.3226
+      0.3327,
+      0.5719,
+      1.329
      ],
      "texture": "RibGrowth_Bone.png",
-     "tris": 2219
+     "tris": 545
     },
     {
      "name": "RibGrowth_Flesh",
      "offset": [
-      0.0006,
-      -0.0197,
-      0.0001
+      0.0005,
+      -0.0191,
+      0.0006
      ],
      "role": "Flesh",
      "size": [
-      0.3593,
-      0.1807,
-      1.1019
+      0.3555,
+      0.1815,
+      1.1028
      ],
      "texture": "RibGrowth_Flesh.png",
-     "tris": 781
+     "tris": 203
     }
    ],
    "sided": true,
@@ -6866,34 +6834,34 @@
     {
      "name": "SerpentBody_Flesh",
      "offset": [
-      -0.1713,
-      -2.2207,
-      0.5051
+      -0.0779,
+      -2.062,
+      -0.4483
      ],
      "role": "Flesh",
      "size": [
-      1.2737,
-      1.8241,
-      2.8178
+      1.0806,
+      1.5227,
+      0.9121
      ],
      "texture": "SerpentBody_Flesh.png",
-     "tris": 1293
+     "tris": 333
     },
     {
      "name": "SerpentBody_Skin",
      "offset": [
-      -0.6318,
-      -1.6037,
-      0.9096
+      -0.6319,
+      -1.6021,
+      0.9066
      ],
      "role": "Skin",
      "size": [
-      2.6819,
-      3.2159,
-      3.1787
+      2.6883,
+      3.216,
+      3.1938
      ],
      "texture": "SerpentBody_Skin.png",
-     "tris": 7705
+     "tris": 1915
     }
    ],
    "sided": false,
@@ -6910,50 +6878,50 @@
     {
      "name": "Shell_BoneDark",
      "offset": [
-      0.0009,
-      -0.2884,
-      0.3801
+      0.0013,
+      -0.2927,
+      0.3846
      ],
      "role": "BoneDark",
      "size": [
-      1.7743,
-      1.4102,
-      0.2632
+      1.7613,
+      1.4025,
+      0.2586
      ],
      "texture": "Shell_BoneDark.png",
-     "tris": 1241
+     "tris": 268
     },
     {
      "name": "Shell_SkinDark",
      "offset": [
-      -0.0015,
-      -0.3267,
-      0.1599
+      -0.0005,
+      -0.3022,
+      0.1708
      ],
      "role": "SkinDark",
      "size": [
-      1.737,
-      1.3679,
-      0.6387
+      1.7453,
+      1.421,
+      0.6653
      ],
      "texture": "Shell_SkinDark.png",
-     "tris": 1553
+     "tris": 413
     },
     {
      "name": "Shell_SkinDeep",
      "offset": [
-      -0.0005,
-      0.1569,
-      0.1396
+      -0.0,
+      0.1192,
+      0.1503
      ],
      "role": "SkinDeep",
      "size": [
-      1.8984,
-      1.3871,
-      0.6412
+      1.8976,
+      1.4598,
+      0.6634
      ],
      "texture": "Shell_SkinDeep.png",
-     "tris": 1706
+     "tris": 443
     }
    ],
    "sided": false,
@@ -6984,66 +6952,66 @@
     {
      "name": "SkullHead_Bone",
      "offset": [
-      -0.0015,
-      0.184,
-      -0.0049
+      -0.0017,
+      0.1627,
+      -0.006
      ],
      "role": "Bone",
      "size": [
-      1.1223,
-      1.2349,
-      1.3565
+      1.1245,
+      1.2783,
+      1.3588
      ],
      "texture": "SkullHead_Bone.png",
-     "tris": 4133
+     "tris": 1034
     },
     {
      "name": "SkullHead_BoneDark",
      "offset": [
-      -0.0024,
-      -0.1454,
-      -0.1429
+      0.0001,
+      -0.1514,
+      -0.1459
      ],
      "role": "BoneDark",
      "size": [
-      0.8375,
-      1.5442,
-      0.8715
+      0.8393,
+      1.5365,
+      0.866
      ],
      "texture": "SkullHead_BoneDark.png",
-     "tris": 1676
+     "tris": 433
     },
     {
      "name": "SkullHead_Teeth",
      "offset": [
-      -0.0009,
-      -0.3952,
-      -0.5209
+      0.0016,
+      -0.3991,
+      -0.5131
      ],
      "role": "Teeth",
      "size": [
-      0.6313,
-      0.2143,
-      0.1755
+      0.6298,
+      0.2011,
+      0.1698
      ],
      "texture": "SkullHead_Teeth.png",
-     "tris": 522
+     "tris": 101
     },
     {
      "name": "SkullHead_Void",
      "offset": [
-      0.0007,
-      0.0365,
-      -0.5464
+      0.006,
+      0.0473,
+      -0.5467
      ],
      "role": "Void",
      "size": [
-      0.7331,
-      0.4617,
-      0.2675
+      0.7554,
+      0.4694,
+      0.2674
      ],
      "texture": "SkullHead_Void.png",
-     "tris": 667
+     "tris": 182
     }
    ],
    "sided": false,
@@ -7253,34 +7221,34 @@
     {
      "name": "Spikes_Bone",
      "offset": [
-      0.0025,
-      -0.5778,
-      0.2492
+      -0.0014,
+      -0.5758,
+      0.2421
      ],
      "role": "Bone",
      "size": [
-      0.2149,
-      1.8274,
-      0.5484
+      0.2363,
+      1.8249,
+      0.5599
      ],
      "texture": "Spikes_Bone.png",
-     "tris": 1615
+     "tris": 378
     },
     {
      "name": "Spikes_SkinDark",
      "offset": [
-      -0.0002,
-      -0.696,
-      0.0125
+      -0.0004,
+      -0.6944,
+      0.0171
      ],
      "role": "SkinDark",
      "size": [
-      0.2398,
-      1.6042,
-      0.2071
+      0.2425,
+      1.6077,
+      0.223
      ],
      "texture": "Spikes_SkinDark.png",
-     "tris": 1383
+     "tris": 370
     }
    ],
    "sided": false,
@@ -7302,34 +7270,34 @@
     {
      "name": "SplayedFoot_Claw",
      "offset": [
-      -0.0003,
-      0.0524,
-      -1.0487
+      -0.0027,
+      0.0571,
+      -1.049
      ],
      "role": "Claw",
      "size": [
-      0.7691,
-      0.0831,
-      0.1832
+      0.771,
+      0.0911,
+      0.1836
      ],
      "texture": "SplayedFoot_Claw.png",
-     "tris": 322
+     "tris": 77
     },
     {
      "name": "SplayedFoot_Skin",
      "offset": [
-      -0.0032,
-      0.1416,
-      -0.38
+      -0.0023,
+      0.1426,
+      -0.398
      ],
      "role": "Skin",
      "size": [
-      0.745,
-      0.281,
-      1.3936
+      0.7629,
+      0.2794,
+      1.434
      ],
      "texture": "SplayedFoot_Skin.png",
-     "tris": 3178
+     "tris": 797
     }
    ],
    "sided": true,
@@ -7350,82 +7318,82 @@
     {
      "name": "SplitJawHead_Eye",
      "offset": [
-      -0.0048,
-      0.5937,
-      -0.4385
+      -0.0047,
+      0.5929,
+      -0.4373
      ],
      "role": "Eye",
      "size": [
-      0.7668,
-      0.1418,
-      0.0896
+      0.7665,
+      0.1426,
+      0.0908
      ],
      "texture": null,
-     "tris": 308
+     "tris": 78
     },
     {
      "name": "SplitJawHead_Skin",
      "offset": [
-      0.0002,
-      -0.0448,
-      0.0652
+      0.0011,
+      -0.0441,
+      0.0662
      ],
      "role": "Skin",
      "size": [
-      1.7976,
-      1.8553,
-      1.5345
+      1.7986,
+      1.8587,
+      1.5363
      ],
      "texture": "SplitJawHead_Skin.png",
-     "tris": 5804
+     "tris": 1490
     },
     {
      "name": "SplitJawHead_SkinDeep",
      "offset": [
-      -0.0013,
-      0.5901,
-      -0.4098
+      -0.0037,
+      0.618,
+      -0.412
      ],
      "role": "SkinDeep",
      "size": [
-      0.7568,
-      0.1963,
-      0.1363
+      0.4222,
+      0.1382,
+      0.1263
      ],
      "texture": "SplitJawHead_SkinDeep.png",
-     "tris": 215
+     "tris": 29
     },
     {
      "name": "SplitJawHead_Teeth",
      "offset": [
-      -0.0,
-      -0.3911,
-      -0.5279
+      -0.0041,
+      -0.3922,
+      -0.5292
      ],
      "role": "Teeth",
      "size": [
-      1.3773,
-      1.0248,
-      0.1487
+      1.375,
+      1.0243,
+      0.1396
      ],
      "texture": "SplitJawHead_Teeth.png",
-     "tris": 833
+     "tris": 186
     },
     {
      "name": "SplitJawHead_Void",
      "offset": [
-      0.0005,
-      -0.2179,
-      -0.2057
+      0.0001,
+      -0.2196,
+      -0.2039
      ],
      "role": "Void",
      "size": [
-      0.7264,
-      0.9765,
-      0.7811
+      0.7272,
+      0.977,
+      0.8135
      ],
      "texture": "SplitJawHead_Void.png",
-     "tris": 840
+     "tris": 215
     }
    ],
    "sided": false,
@@ -7636,50 +7604,50 @@
     {
      "name": "StraightHorn_Bone",
      "offset": [
-      0.0031,
-      0.5941,
-      0.0239
+      0.0008,
+      0.595,
+      0.0238
      ],
      "role": "Bone",
      "size": [
-      0.1702,
-      0.7623,
-      0.2012
+      0.1678,
+      0.7611,
+      0.201
      ],
      "texture": "StraightHorn_Bone.png",
-     "tris": 1123
+     "tris": 295
     },
     {
      "name": "StraightHorn_BoneDark",
      "offset": [
-      -0.0053,
-      0.0621,
-      0.0022
+      -0.0071,
+      0.0742,
+      -0.0017
      ],
      "role": "BoneDark",
      "size": [
-      0.2643,
-      0.413,
-      0.2461
+      0.291,
+      0.4345,
+      0.299
      ],
      "texture": "StraightHorn_BoneDark.png",
-     "tris": 694
+     "tris": 188
     },
     {
      "name": "StraightHorn_Skin",
      "offset": [
-      0.0002,
-      -0.0523,
-      0.0001
+      0.0004,
+      -0.0555,
+      -0.0003
      ],
      "role": "Skin",
      "size": [
-      0.309,
-      0.1483,
-      0.3092
+      0.306,
+      0.1588,
+      0.3111
      ],
      "texture": "StraightHorn_Skin.png",
-     "tris": 683
+     "tris": 141
     }
    ],
    "sided": true,
@@ -7697,50 +7665,50 @@
     {
      "name": "StubHorn_Bone",
      "offset": [
-      -0.0012,
-      0.2301,
-      0.0068
+      -0.0013,
+      0.2174,
+      0.0051
      ],
      "role": "Bone",
      "size": [
-      0.1649,
-      0.2527,
-      0.1585
+      0.1708,
+      0.2781,
+      0.1656
      ],
      "texture": "StubHorn_Bone.png",
-     "tris": 615
+     "tris": 191
     },
     {
      "name": "StubHorn_BoneDark",
      "offset": [
-      -0.0017,
-      0.01,
-      0.0049
+      0.0005,
+      0.0132,
+      -0.0012
      ],
      "role": "BoneDark",
      "size": [
-      0.254,
-      0.3074,
-      0.266
+      0.2967,
+      0.3149,
+      0.3012
      ],
      "texture": "StubHorn_BoneDark.png",
-     "tris": 805
+     "tris": 176
     },
     {
      "name": "StubHorn_Skin",
      "offset": [
-      0.0002,
-      -0.0554,
-      0.0002
+      -0.0001,
+      -0.0532,
+      0.0008
      ],
      "role": "Skin",
      "size": [
-      0.3098,
-      0.146,
-      0.3098
+      0.3111,
+      0.1624,
+      0.3093
      ],
      "texture": "StubHorn_Skin.png",
-     "tris": 1080
+     "tris": 257
     }
    ],
    "sided": true,
@@ -7758,34 +7726,34 @@
     {
      "name": "TalonFoot_Claw",
      "offset": [
-      0.0005,
-      0.0579,
-      -0.18
+      -0.0011,
+      0.0585,
+      -0.1786
      ],
      "role": "Claw",
      "size": [
-      0.4135,
-      0.1499,
-      1.1948
+      0.4162,
+      0.1475,
+      1.1957
      ],
      "texture": "TalonFoot_Claw.png",
-     "tris": 733
+     "tris": 172
     },
     {
      "name": "TalonFoot_SkinDark",
      "offset": [
-      0.0,
+      -0.0003,
       0.1401,
-      -0.23
+      -0.239
      ],
      "role": "SkinDark",
      "size": [
-      0.4202,
-      0.261,
-      0.8756
+      0.418,
+      0.2643,
+      0.8862
      ],
      "texture": "TalonFoot_SkinDark.png",
-     "tris": 2265
+     "tris": 578
     }
    ],
    "sided": true,
@@ -7802,50 +7770,50 @@
     {
      "name": "TalonHand_Claw",
      "offset": [
-      -0.2329,
-      -0.8355,
-      -0.037
+      -0.2326,
+      -0.8428,
+      -0.0281
      ],
      "role": "Claw",
      "size": [
-      0.2656,
-      0.8319,
-      0.5601
+      0.2723,
+      0.8235,
+      0.5453
      ],
      "texture": "TalonHand_Claw.png",
-     "tris": 702
+     "tris": 172
     },
     {
      "name": "TalonHand_Skin",
      "offset": [
-      -0.0499,
-      -0.5167,
-      -0.0548
+      -0.049,
+      -0.5263,
+      -0.0556
      ],
      "role": "Skin",
      "size": [
-      0.4028,
-      1.0773,
-      0.6215
+      0.4022,
+      1.0962,
+      0.6249
      ],
      "texture": "TalonHand_Skin.png",
-     "tris": 2622
+     "tris": 685
     },
     {
      "name": "TalonHand_SkinLight",
      "offset": [
-      0.0445,
-      -0.3826,
-      0.0014
+      0.0467,
+      -0.384,
+      0.0007
      ],
      "role": "SkinLight",
      "size": [
-      0.122,
-      0.1638,
-      0.509
+      0.1113,
+      0.1722,
+      0.5123
      ],
      "texture": "TalonHand_SkinLight.png",
-     "tris": 174
+     "tris": 17
     }
    ],
    "sided": true,
@@ -7863,34 +7831,34 @@
     {
      "name": "Tendril_Flesh",
      "offset": [
-      0.1593,
-      0.481,
-      0.7137
+      0.2527,
+      0.7339,
+      1.0102
      ],
      "role": "Flesh",
      "size": [
-      0.277,
-      0.5584,
-      0.8255
+      0.1071,
+      0.0662,
+      0.2454
      ],
      "texture": "Tendril_Flesh.png",
-     "tris": 76
+     "tris": 6
     },
     {
      "name": "Tendril_Skin",
      "offset": [
-      0.1156,
-      0.3581,
-      0.6404
+      0.1148,
+      0.3592,
+      0.6402
      ],
      "role": "Skin",
      "size": [
-      0.5089,
-      0.9966,
-      1.5604
+      0.5112,
+      1.001,
+      1.5599
      ],
      "texture": "Tendril_Skin.png",
-     "tris": 2924
+     "tris": 744
     }
    ],
    "sided": false,
@@ -7905,36 +7873,20 @@
    "grade": "Grade2",
    "pieces": [
     {
-     "name": "TentacleArm_Flesh",
-     "offset": [
-      -0.2697,
-      -0.6703,
-      -0.0442
-     ],
-     "role": "Flesh",
-     "size": [
-      0.3005,
-      1.5731,
-      0.7675
-     ],
-     "texture": "TentacleArm_Flesh.png",
-     "tris": 83
-    },
-    {
      "name": "TentacleArm_Skin",
      "offset": [
-      -0.3771,
-      -0.3565,
-      -0.1778
+      -0.3763,
+      -0.3558,
+      -0.1767
      ],
      "role": "Skin",
      "size": [
-      0.7397,
-      2.2702,
-      1.0411
+      0.7395,
+      2.2727,
+      1.0398
      ],
      "texture": "TentacleArm_Skin.png",
-     "tris": 4917
+     "tris": 1250
     }
    ],
    "pivot": [
@@ -8006,18 +7958,18 @@
     {
      "name": "ThinArm_Skin",
      "offset": [
-      -0.4343,
-      -0.3453,
-      0.001
+      -0.4345,
+      -0.3451,
+      0.0013
      ],
      "role": "Skin",
      "size": [
-      0.4572,
-      2.036,
-      0.4676
+      0.4599,
+      2.0346,
+      0.4677
      ],
      "texture": "ThinArm_Skin.png",
-     "tris": 5000
+     "tris": 1248
     }
    ],
    "pivot": [
@@ -8112,18 +8064,18 @@
     {
      "name": "ThinLeg_Skin",
      "offset": [
-      0.0082,
-      0.0947,
-      -0.0097
+      0.0076,
+      0.095,
+      -0.0093
      ],
      "role": "Skin",
      "size": [
-      0.4939,
-      2.1119,
-      0.5468
+      0.4929,
+      2.11,
+      0.5466
      ],
      "texture": "ThinLeg_Skin.png",
-     "tris": 4998
+     "tris": 1250
     }
    ],
    "pivot": [
@@ -8195,66 +8147,66 @@
     {
      "name": "Tumor_Flesh",
      "offset": [
-      -0.0751,
-      0.1051,
-      -0.0226
+      -0.0813,
+      0.1,
+      -0.0197
      ],
      "role": "Flesh",
      "size": [
-      0.3843,
-      0.3482,
-      0.5552
+      0.4032,
+      0.3513,
+      0.5825
      ],
      "texture": "Tumor_Flesh.png",
-     "tris": 541
+     "tris": 149
     },
     {
      "name": "Tumor_Skin",
      "offset": [
-      0.1063,
-      0.0928,
-      -0.0644
+      0.0767,
+      0.0953,
+      -0.0393
      ],
      "role": "Skin",
      "size": [
-      0.3444,
-      0.3531,
-      0.4745
+      0.4058,
+      0.3572,
+      0.5251
      ],
      "texture": "Tumor_Skin.png",
-     "tris": 633
+     "tris": 161
     },
     {
      "name": "Tumor_SkinDark",
      "offset": [
-      0.0005,
-      0.0213,
-      0.0003
+      -0.001,
+      0.0261,
+      -0.0002
      ],
      "role": "SkinDark",
      "size": [
-      0.6725,
-      0.1479,
-      0.6449
+      0.6753,
+      0.1401,
+      0.6438
      ],
      "texture": "Tumor_SkinDark.png",
-     "tris": 417
+     "tris": 89
     },
     {
      "name": "Tumor_SkinLight",
      "offset": [
-      0.014,
-      0.1272,
-      0.0748
+      0.0151,
+      0.1249,
+      0.0703
      ],
      "role": "SkinLight",
      "size": [
-      0.5395,
-      0.3913,
-      0.5059
+      0.5398,
+      0.3962,
+      0.5176
      ],
      "texture": "Tumor_SkinLight.png",
-     "tris": 909
+     "tris": 225
     }
    ],
    "sided": false,
@@ -8279,50 +8231,50 @@
     {
      "name": "Wing_Membrane",
      "offset": [
-      1.4345,
-      0.3231,
-      0.6208
+      1.4092,
+      0.3269,
+      0.6099
      ],
      "role": "Membrane",
      "size": [
-      2.4806,
-      2.0936,
-      1.0062
+      2.5241,
+      2.0955,
+      1.0235
      ],
      "texture": "Wing_Membrane.png",
-     "tris": 2909
+     "tris": 926
     },
     {
      "name": "Wing_Skin",
      "offset": [
-      0.0099,
-      0.049,
-      0.0509
+      0.0067,
+      0.0488,
+      0.0521
      ],
      "role": "Skin",
      "size": [
-      0.5407,
-      0.4792,
-      0.5612
+      0.5356,
+      0.4921,
+      0.5592
      ],
      "texture": "Wing_Skin.png",
-     "tris": 509
+     "tris": 88
     },
     {
      "name": "Wing_SkinDark",
      "offset": [
-      1.3323,
-      0.3569,
-      0.557
+      1.1797,
+      0.4779,
+      0.4631
      ],
      "role": "SkinDark",
      "size": [
-      2.5038,
-      1.9168,
-      1.0849
+      2.3743,
+      1.5828,
+      1.1342
      ],
      "texture": "Wing_SkinDark.png",
-     "tris": 1580
+     "tris": 236
     }
    ],
    "sided": true,

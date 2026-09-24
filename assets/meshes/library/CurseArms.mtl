@@ -8,11 +8,6 @@ Kd 1 1 1
 d 1
 map_Kd textures/MuscularArm_Skin.png
 
-newmtl MuscularArm_SkinDark
-Kd 1 1 1
-d 1
-map_Kd textures/MuscularArm_SkinDark.png
-
 newmtl MuscularArm_SkinLight
 Kd 1 1 1
 d 1
@@ -37,11 +32,6 @@ newmtl BoneArm_SkinDark
 Kd 1 1 1
 d 1
 map_Kd textures/BoneArm_SkinDark.png
-
-newmtl TentacleArm_Flesh
-Kd 1 1 1
-d 1
-map_Kd textures/TentacleArm_Flesh.png
 
 newmtl TentacleArm_Skin
 Kd 1 1 1
